@@ -123,7 +123,7 @@ public final class GlassMotion {
     /** Profundidade: sobe um pouco no hover (2,5%), afunda ao pressionar (4%). */
     private static void scale(Node node) {
         boolean pressed = node.isPressed();
-        double target = pressed ? 0.96 : node.isHover() && !node.isDisabled() ? 1.025 : 1.0;
+        double target = pressed ? 0.96 : node.isHover() && !node.isDisabled() ? 1.015 : 1.0;
         ScaleTransition scale = new ScaleTransition(Duration.millis(pressed ? 70 : 170), node);
         scale.setInterpolator(EASE);
         scale.setToX(target);
