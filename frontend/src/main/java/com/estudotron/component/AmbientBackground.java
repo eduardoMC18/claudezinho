@@ -23,8 +23,9 @@ import javafx.scene.transform.Transform;
 import javafx.util.Duration;
 
 /**
- * Fundo do Light Liquid Glass: um ambiente claro e iluminado, com poças de luz (verde, ciano,
- * magenta, lavanda). Alguns anéis coloridos abstratos aparecem só através do vidro, desfocados.
+ * Fundo do Liquid Glass: um ambiente branco e neutro, com variações discretas de luminosidade. Atrás dele
+ * (só na imagem desfocada) ficam esferas e anéis de vidro/prata: é o que o vidro dos painéis refrata e
+ * desfoca, e o que faz a transparência ser perceptível. Nas frestas entre os painéis o fundo fica liso.
  *
  * <p><b>Desfoque real por trás dos painéis.</b> O JavaFX não tem backdrop blur. Como este fundo é
  * estático, ele é capturado em baixa resolução, desfocado uma única vez e publicado em
@@ -36,29 +37,42 @@ public final class AmbientBackground extends Pane {
 
     /** Escala da captura (1/4 da resolução: o desfoque esconde a diferença e fica 16x mais barato). */
     private static final double FROST_SCALE = 0.25;
-    private static final double FROST_BLUR = 13; // em pixels da captura reduzida (~52 px reais)
+    private static final double FROST_BLUR = 8; // em pixels da captura reduzida (~32 px reais): ainda reconhecível
 
     private record Glow(double fx, double fy, double radius, Color color, double alpha) {}
 
+    /** Anel de prata (traço em gradiente). */
     private record Ring(double fx, double fy, double radius, double width, Color from, Color to, double alpha) {}
 
+    /** Esfera de vidro: corpo cinza-azulado com um ponto de luz. */
+    private record Orb(double fx, double fy, double radius, Color body, double alpha) {}
+
+    /** Luz ambiente: branco dominante, só um toque frio e sombras cinza muito suaves. */
     private static final Glow[] GLOWS = {
-            new Glow(0.08, 0.06, 520, Color.web("#4df0ae"), 0.36),   // verde luminoso, topo esquerdo
-            new Glow(0.62, -0.05, 480, Color.web("#4fd6ff"), 0.32),  // ciano, topo
-            new Glow(0.97, 0.92, 560, Color.web("#ff74d4"), 0.28),   // magenta, base direita
-            new Glow(0.03, 1.02, 460, Color.web("#b7a6ff"), 0.26),   // lavanda, base esquerda
-            new Glow(0.55, 0.62, 380, Color.web("#7df5e0"), 0.14),   // água, centro
+            new Glow(0.28, 0.06, 640, Color.web("#ffffff"), 0.95),   // fonte de luz, topo
+            new Glow(0.72, 0.58, 460, Color.web("#ffffff"), 0.70),   // brilho central
+            new Glow(1.00, 1.00, 640, Color.web("#8d99b2"), 0.24),   // sombra cinza, canto inferior
+            new Glow(0.00, 0.98, 520, Color.web("#c3d0ea"), 0.26),   // toque frio, canto inferior esquerdo
+            new Glow(0.98, 0.02, 420, Color.web("#d3dcee"), 0.30),   // toque frio, canto superior direito
     };
 
+    // Só entram na imagem desfocada (atrás do vidro).
     private static final Ring[] RINGS = {
-            new Ring(0.345, 0.50, 210, 30, Color.web("#3fe6a8"), Color.web("#46cdf7"), 0.38),
-            new Ring(0.70, 0.36, 130, 22, Color.web("#ff7fd6"), Color.web("#a99bff"), 0.32),
-            new Ring(0.86, 0.78, 90, 16, Color.web("#46cdf7"), Color.web("#5df0b6"), 0.32),
+            new Ring(0.38, 0.52, 230, 36, Color.web("#46526e"), Color.web("#b7c3da"), 0.32),
+            new Ring(0.74, 0.30, 140, 24, Color.web("#5d6b88"), Color.web("#c9d3e6"), 0.30),
+            new Ring(0.93, 0.70, 100, 18, Color.web("#46526e"), Color.web("#aebbd3"), 0.28),
+    };
+
+    private static final Orb[] ORBS = {
+            new Orb(0.07, 0.26, 130, Color.web("#4d5a78"), 0.34),    // atrás da barra lateral
+            new Orb(0.60, 0.80, 170, Color.web("#56637f"), 0.30),
+            new Orb(0.90, 0.16, 110, Color.web("#4d5a78"), 0.28),
     };
 
     private final Region base = new Region();
     private final Circle[] glows = new Circle[GLOWS.length];
     private final Circle[] rings = new Circle[RINGS.length];
+    private final Circle[] orbs = new Circle[ORBS.length];
     private final ReadOnlyObjectWrapper<Image> frost = new ReadOnlyObjectWrapper<>();
     private final PauseTransition debounce = new PauseTransition(Duration.millis(140));
 
@@ -88,6 +102,20 @@ public final class AmbientBackground extends Pane {
             circle.setManaged(false);
             circle.setVisible(false); // só entram na imagem desfocada (ver renderFrost)
             rings[i] = circle;
+            getChildren().add(circle);
+        }
+
+        for (int i = 0; i < ORBS.length; i++) {
+            Orb o = ORBS[i];
+            Circle circle = new Circle(o.radius());
+            // corpo escuro na borda e luz no ponto superior esquerdo: lê como uma esfera de vidro
+            circle.setFill(new RadialGradient(0, 0, 0.34, 0.30, 0.78, true, CycleMethod.NO_CYCLE,
+                    new Stop(0.0, alpha(Color.WHITE, o.alpha() * 0.85)),
+                    new Stop(0.45, alpha(o.body(), o.alpha() * 0.55)),
+                    new Stop(1.0, alpha(o.body(), o.alpha()))));
+            circle.setManaged(false);
+            circle.setVisible(false);
+            orbs[i] = circle;
             getChildren().add(circle);
         }
 
@@ -131,6 +159,19 @@ public final class AmbientBackground extends Pane {
             rings[i].setCenterX(w * RINGS[i].fx());
             rings[i].setCenterY(h * RINGS[i].fy());
         }
+        for (int i = 0; i < orbs.length; i++) {
+            orbs[i].setCenterX(w * ORBS[i].fx());
+            orbs[i].setCenterY(h * ORBS[i].fy());
+        }
+    }
+
+    private void setBehindGlassVisible(boolean visible) {
+        for (Circle ring : rings) {
+            ring.setVisible(visible);
+        }
+        for (Circle orb : orbs) {
+            orb.setVisible(visible);
+        }
     }
 
     /** Captura o fundo em 1/4 da resolução e desfoca. Roda só quando a janela muda de tamanho. */
@@ -146,13 +187,9 @@ public final class AmbientBackground extends Pane {
         small.setViewport(new Rectangle2D(0, 0, Math.ceil(w * FROST_SCALE), Math.ceil(h * FROST_SCALE)));
         // Os anéis coloridos existem apenas "atrás do vidro": aparecem borrados através dos painéis,
         // mas não nas frestas entre eles (onde uma fatia nítida de anel pareceria um defeito).
-        for (Circle ring : rings) {
-            ring.setVisible(true);
-        }
+        setBehindGlassVisible(true);
         WritableImage reduced = snapshot(small, null);
-        for (Circle ring : rings) {
-            ring.setVisible(false);
-        }
+        setBehindGlassVisible(false);
 
         ImageView blurView = new ImageView(reduced);
         blurView.setEffect(new GaussianBlur(FROST_BLUR));

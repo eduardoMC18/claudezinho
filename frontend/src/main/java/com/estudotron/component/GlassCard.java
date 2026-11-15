@@ -23,6 +23,8 @@ public class GlassCard extends StackPane {
 
     private static final double SHADOW_INSET = 6;
     private static final double ARC = 44; // diâmetro do canto (raio 22, igual ao CSS)
+    /** Ampliação do fundo visto através do vidro (refração simulada: o conteúdo atrás parece levemente aumentado). */
+    private static final double LENS = 1.045;
 
     private final Region shadow = new Region();
     private final ImageView backdrop = new ImageView();
@@ -94,9 +96,12 @@ public class GlassCard extends StackPane {
         if (origin == null) {
             return;
         }
-        backdrop.setFitWidth(ambient.getWidth());
-        backdrop.setFitHeight(ambient.getHeight());
-        backdrop.setLayoutX(-origin.getX());
-        backdrop.setLayoutY(-origin.getY());
+        // O ponto do fundo que está no centro do cartão continua no centro; o resto se afasta dele em LENS vezes.
+        double cx = getWidth() / 2;
+        double cy = getHeight() / 2;
+        backdrop.setFitWidth(ambient.getWidth() * LENS);
+        backdrop.setFitHeight(ambient.getHeight() * LENS);
+        backdrop.setLayoutX(cx - LENS * (origin.getX() + cx));
+        backdrop.setLayoutY(cy - LENS * (origin.getY() + cy));
     }
 }
