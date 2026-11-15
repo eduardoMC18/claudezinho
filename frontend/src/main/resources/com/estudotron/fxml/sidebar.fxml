@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.estudotron.component.GlassCard?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Barra lateral minimalista: identidade do app e as duas seções (Leitor de PDFs e Criar Exercícios). -->
+<GlassCard xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:id="card">
+    <fx:define>
+        <ToggleGroup fx:id="navGroup"/>
+    </fx:define>
+    <VBox fx:id="root" styleClass="sidebar, glass" spacing="6">
+        <HBox fx:id="brand" styleClass="sidebar-brand" alignment="CENTER_LEFT" spacing="10">
+            <StackPane fx:id="logoMark" styleClass="logo-mark"/>
+            <Label fx:id="appName" styleClass="app-name" minWidth="0"/>
+        </HBox>
+        <ToggleButton fx:id="readerItem" text="Leitor de PDFs" styleClass="nav-item" selected="true"
+                      toggleGroup="$navGroup" maxWidth="Infinity" onAction="#openReader"/>
+        <ToggleButton fx:id="exercisesItem" text="Criar Exercícios" styleClass="nav-item"
+                      toggleGroup="$navGroup" maxWidth="Infinity" onAction="#openExercises"/>
+        <Region VBox.vgrow="ALWAYS"/>
+        <Button fx:id="collapseButton" styleClass="icon-button, sidebar-collapse" onAction="#toggleCollapsed"/>
+    </VBox>
+</GlassCard>

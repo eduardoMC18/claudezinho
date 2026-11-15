@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.estudotron.component.AmbientBackground?>
+<?import com.estudotron.component.GlassCard?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Configurações de IA: provedor padrão, chave da API (guardada no cofre do Windows), modelo e teste de conexão. -->
+<StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" styleClass="app-root">
+<AmbientBackground/>
+<VBox fx:id="root" styleClass="settings-root">
+    <VBox styleClass="settings-header" spacing="4">
+        <Label text="Configurações de IA" styleClass="settings-title"/>
+        <Label text="Escolha o provedor e o modelo e guarde a chave de API com segurança neste computador."
+               styleClass="muted" wrapText="true"/>
+    </VBox>
+
+    <ScrollPane styleClass="chat-scroll" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+        <VBox styleClass="settings-body" spacing="14">
+
+            <GlassCard><VBox styleClass="settings-section, glass" spacing="8">
+                <Label text="Provedor padrão" styleClass="section-title"/>
+                <Label text="Usado nas conversas novas. No chat você pode trocar quando quiser." styleClass="muted" wrapText="true"/>
+                <ComboBox fx:id="defaultProviderBox" maxWidth="Infinity"/>
+            </VBox></GlassCard>
+
+            <GlassCard><VBox styleClass="settings-section, glass" spacing="10">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Provedor" styleClass="section-title"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <ComboBox fx:id="providerBox" prefWidth="230"/>
+                </HBox>
+
+                <Label text="Chave da API" styleClass="field-label"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <PasswordField fx:id="keyField" HBox.hgrow="ALWAYS" promptText="Cole a chave aqui"/>
+                    <Button fx:id="saveKeyButton" text="Salvar chave" styleClass="primary" onAction="#saveKey"/>
+                </HBox>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <StackPane fx:id="keyStatusIcon"/>
+                    <Label fx:id="keyStatus" styleClass="muted" wrapText="true" HBox.hgrow="ALWAYS"/>
+                </HBox>
+
+                <Label text="Modelo" styleClass="field-label"/>
+                <ComboBox fx:id="modelBox" maxWidth="Infinity"/>
+                <Label fx:id="modelInfo" styleClass="muted-info" wrapText="true"/>
+
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Button fx:id="testButton" text="Testar conexão" styleClass="secondary" onAction="#testConnection"/>
+                    <Button fx:id="removeKeyButton" text="Remover chave" styleClass="secondary, danger-hover"
+                            onAction="#removeKey"/>
+                </HBox>
+                <Label fx:id="resultLabel" wrapText="true" visible="false" managed="false"/>
+            </VBox></GlassCard>
+
+            <HBox styleClass="security-note" spacing="10" alignment="TOP_LEFT">
+                <StackPane fx:id="shieldIcon"/>
+                <Label text="A chave fica no Gerenciador de Credenciais do Windows, nunca em arquivos do programa, e não é exibida de novo nem registrada em logs."
+                       styleClass="muted" wrapText="true" HBox.hgrow="ALWAYS"/>
+            </HBox>
+        </VBox>
+    </ScrollPane>
+
+    <HBox styleClass="settings-footer" alignment="CENTER_RIGHT">
+        <Button text="Fechar" styleClass="primary" onAction="#close"/>
+    </HBox>
+</VBox>
+</StackPane>

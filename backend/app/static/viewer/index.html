@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Visualizador PDF</title>
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <div id="toolbar">
+    <button id="prev" title="Página anterior">&#9664;</button>
+    <input id="page-input" type="number" min="1" value="1">
+    <span id="page-count">/ 0</span>
+    <button id="next" title="Próxima página">&#9654;</button>
+    <span class="spacer"></span>
+    <button id="zoom-out" title="Diminuir zoom">&minus;</button>
+    <span id="zoom-label">100%</span>
+    <button id="zoom-in" title="Aumentar zoom">+</button>
+    <button id="fit" class="toggle active" title="Ajustar o zoom à largura do painel automaticamente">Ajustar</button>
+  </div>
+  <div id="scroller"><div id="pages"></div></div>
+  <div id="message"></div>
+  <script src="pdfjs/pdf.min.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.estudotron.component.AmbientBackground?>
+<?import com.estudotron.component.Toast?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.StackPane?>
+
+<!-- Janela: luz ambiente ao fundo; por cima, barra lateral | área de conteúdo (leitor de PDFs).
+     O controller é definido em código (MainController). -->
+<StackPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" styleClass="app-root">
+    <AmbientBackground/>
+    <BorderPane>
+        <left>
+            <StackPane fx:id="sidebarHost" styleClass="sidebar-host"/>
+        </left>
+        <center>
+            <StackPane fx:id="contentHost">
+                <!-- Leitor de PDFs: exatamente a interface que já existia (cabeçalho + PDF 1 | PDF 2 | chat) -->
+                <BorderPane fx:id="readerView">
+                    <top>
+                        <StackPane fx:id="headerHost" styleClass="header-host"/>
+                    </top>
+                    <center>
+                        <SplitPane fx:id="mainSplit" orientation="HORIZONTAL" styleClass="main-split">
+                            <items>
+                                <SplitPane fx:id="documentsSplit" orientation="HORIZONTAL"
+                                           styleClass="documents-split" minWidth="540"/>
+                                <StackPane fx:id="chatHost" minWidth="300"/>
+                            </items>
+                        </SplitPane>
+                    </center>
+                </BorderPane>
+            </StackPane>
+        </center>
+    </BorderPane>
+    <Toast fx:id="toast" StackPane.alignment="BOTTOM_CENTER">
+        <StackPane.margin>
+            <Insets bottom="28"/>
+        </StackPane.margin>
+    </Toast>
+</StackPane>

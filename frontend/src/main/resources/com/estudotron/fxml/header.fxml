@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.estudotron.component.GlassCard?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+
+<!-- Cabeçalho: barra de vidro flutuante com adicionar PDF 1/2, indicadores, chat e configurações. -->
+<GlassCard xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+    <HBox fx:id="root" styleClass="header, glass-bar" alignment="CENTER_LEFT" spacing="12">
+        <Button fx:id="addFirstButton" text="Adicionar PDF 1" styleClass="primary" onAction="#addFirst"
+                minWidth="-Infinity"/>
+        <Button fx:id="addSecondButton" text="Adicionar PDF 2" styleClass="secondary" onAction="#addSecond"
+                minWidth="-Infinity"/>
+        <HBox fx:id="chips" alignment="CENTER_LEFT" spacing="8" minWidth="0" HBox.hgrow="SOMETIMES"/>
+        <Region HBox.hgrow="ALWAYS" minWidth="0"/>
+        <ToggleButton fx:id="chatToggle" text="Chat" styleClass="chip-toggle" selected="true" onAction="#toggleChat"
+                      minWidth="-Infinity"/>
+        <Button fx:id="settingsButton" styleClass="icon-button" onAction="#openSettings" minWidth="-Infinity"/>
+    </HBox>
+</GlassCard>

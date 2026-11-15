@@ -1,0 +1,964 @@
+/* ==========================================================================
+   estudoTron 3000 — LIGHT Liquid Glass
+
+   Materiais (do fundo para a frente):
+     1. Fundo da aplicação ........ AmbientBackground: claro, com luzes e anéis coloridos
+     2. Grandes superfícies ....... .glass      (documentos, chat) sobre o fundo DESFOCADO
+     3. Painéis flutuantes ........ .glass-bar  (cabeçalho), menus, avisos
+     4. Controles ................. botões, campos, pílulas: vidro polido
+     5. Interativos em destaque ... primário/selecionado/foco: luz verde→ciano
+
+   VIDRO = fundo desfocado de verdade (GlassCard) + véu branco translúcido + reflexo no topo +
+   leve tinta colorida + borda branca luminosa + contorno finíssimo + sombra difusa.
+
+   Regras: o branco e a transparência dominam; verde/ciano/magenta só em detalhes.
+   Os PDFs NUNCA recebem transparência ou efeito (.viewer-host é sólido).
+   Popups (menus, dicas) são janelas separadas e não enxergam as variáveis do .root:
+   neles as cores vão por extenso.
+   ========================================================================== */
+
+.root {
+    /* texto: preto suave */
+    -g-text: #1c1e24;
+    -g-text-2: rgba(28, 30, 36, 0.64);
+    -g-text-3: rgba(28, 30, 36, 0.44);
+    /* detalhes de cor */
+    -g-green: #25d695;
+    -g-cyan: #25bfee;
+    -g-magenta: #ee5fc4;
+    -g-accent-ink: #087f78;          /* texto/ícone sobre vidro claro (legível) */
+    -g-danger: #d93f5c;
+    -g-success: #12a873;
+    -g-warning: #c98a12;
+    /* linhas */
+    -g-line: rgba(30, 45, 80, 0.085);
+    /* brilho de hover animado por GlassMotion (começa transparente) */
+    -g-hl: transparent;
+
+    -fx-font-family: "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", sans-serif;
+    -fx-font-size: 13px;
+
+    /* neutraliza o Modena */
+    -fx-base: #f3f5f9;
+    -fx-background: #f3f5f9;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: -g-text;
+    -fx-accent: -g-cyan;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.app-root { -fx-background-color: #f3f5f9; }
+.ambient-base {
+    -fx-background-color:
+        linear-gradient(to bottom right, #f9fbfd 0%, #eef2f8 45%, #f6f2fa 100%),
+        radial-gradient(center 50% 40%, radius 70%, rgba(255, 255, 255, 0.90) 0%, transparent 100%);
+}
+
+.label { -fx-text-fill: -g-text; }
+.muted { -fx-text-fill: -g-text-2; }
+.faint { -fx-text-fill: -g-text-3; }
+
+/* ==========================================================================
+   VIDRO — materiais reutilizáveis
+   ========================================================================== */
+
+/* sombra difusa por baixo do cartão (nó irmão do conteúdo) */
+.glass-shadow {
+    -fx-background-color: rgba(255, 255, 255, 0.30);
+    -fx-background-radius: 22;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.30), 38, 0.0, 0, 14);
+}
+
+/* nível 2: grande superfície de vidro */
+.glass {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.50),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.16) 14%, rgba(255, 255, 255, 0.0) 52%, rgba(255, 255, 255, 0.20) 100%),
+        linear-gradient(to bottom right, rgba(70, 235, 175, 0.085) 0%, transparent 42%, rgba(240, 110, 205, 0.070) 100%);
+    -fx-background-radius: 22, 22, 22;
+    -fx-border-color:
+        linear-gradient(to bottom right, rgba(255, 255, 255, 1.0) 0%, rgba(255, 255, 255, 0.62) 36%, rgba(255, 255, 255, 0.40) 68%, rgba(255, 255, 255, 0.95) 100%),
+        rgba(40, 60, 110, 0.085);
+    -fx-border-width: 1.4, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 22, 23;
+}
+
+/* nível 3: barra flutuante (mais leitosa) */
+.glass-bar {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.58),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.0) 100%),
+        linear-gradient(to right, rgba(70, 235, 175, 0.090) 0%, transparent 35%, transparent 65%, rgba(240, 110, 205, 0.075) 100%);
+    -fx-background-radius: 22, 22, 22;
+    -fx-border-color:
+        linear-gradient(to bottom right, rgba(255, 255, 255, 1.0) 0%, rgba(255, 255, 255, 0.60) 45%, rgba(255, 255, 255, 0.95) 100%),
+        rgba(40, 60, 110, 0.085);
+    -fx-border-width: 1.4, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 22, 23;
+}
+
+/* ==========================================================================
+   ÍCONES (traço fino, estilo Lucide)
+   ========================================================================== */
+
+.icon-path {
+    -fx-fill: transparent;
+    -fx-stroke: rgba(28, 30, 36, 0.66);
+    -fx-stroke-width: 1.85;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+.button:hover .icon-path, .toggle-button:hover .icon-path { -fx-stroke: -g-text; }
+.button.primary .icon-path, .button.primary:hover .icon-path { -fx-stroke: #053a3a; }
+.button.danger-hover:hover .icon-path { -fx-stroke: -g-danger; }
+/* detalhe luminoso: traço em gradiente verde→ciano */
+.icon-accent .icon-path { -fx-stroke: linear-gradient(to bottom right, #19c98a, #1fb4ea); }
+.icon-faint .icon-path { -fx-stroke: linear-gradient(to bottom right, rgba(25, 201, 138, 0.70), rgba(238, 95, 196, 0.60)); }
+.icon-ok .icon-path { -fx-stroke: -g-success; }
+
+/* ==========================================================================
+   BOTÕES — vidro polido (nível 4)
+   ========================================================================== */
+
+.button, .toggle-button {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.56),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.25) 48%, rgba(255, 255, 255, 0.0) 52%, rgba(255, 255, 255, 0.28) 100%),
+        -g-hl;
+    -fx-background-radius: 12, 12, 12;
+    -fx-border-color:
+        linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)),
+        rgba(40, 60, 110, 0.11);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 12, 13;
+    -fx-text-fill: -g-text;
+    -fx-padding: 6 13 6 13;
+    -fx-cursor: hand;
+    -fx-graphic-text-gap: 8;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.16), 9, 0.0, 0, 2.5);
+}
+.button:hover, .toggle-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.26), 14, 0.0, 0, 5);
+}
+.button:pressed, .toggle-button:pressed {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.46),
+        linear-gradient(to bottom, rgba(40, 60, 110, 0.07) 0%, rgba(255, 255, 255, 0.35) 100%),
+        -g-hl;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.14), 4, 0.0, 0, 1);
+}
+.button:focused, .toggle-button:focused {
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.30);
+}
+.button:disabled, .toggle-button:disabled { -fx-opacity: 0.42; -fx-cursor: default; }
+
+/* nível 5: primário — vidro com luz verde→ciano */
+.button.primary {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.94) 0%, rgba(74, 210, 246, 0.94) 100%),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.0) 54%, rgba(255, 255, 255, 0.20) 100%),
+        -g-hl;
+    -fx-border-color:
+        linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.50)),
+        rgba(20, 160, 170, 0.28);
+    -fx-text-fill: #053a3a;
+    -fx-font-weight: 600;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 16, 0.0, 0, 4);
+}
+.button.primary:hover { -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.68), 22, 0.0, 0, 6); }
+.button.primary:pressed {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(70, 220, 172, 0.96) 0%, rgba(56, 190, 230, 0.96) 100%),
+        linear-gradient(to bottom, rgba(0, 60, 70, 0.08), rgba(255, 255, 255, 0.15)),
+        -g-hl;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.40), 8, 0.0, 0, 2);
+}
+
+.button.secondary { -fx-background-color: rgba(255, 255, 255, 0.62), linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.25) 48%, rgba(255, 255, 255, 0.0) 52%, rgba(255, 255, 255, 0.28) 100%), -g-hl; }
+
+/* ícone: fantasma (o vidro aparece no hover) */
+.button.icon-button {
+    -fx-background-color: transparent, transparent, -g-hl;
+    -fx-border-color: transparent, transparent;
+    -fx-background-radius: 11, 11, 11;
+    -fx-border-radius: 11, 12;
+    -fx-padding: 6;
+    -fx-min-width: 30; -fx-min-height: 30; -fx-pref-width: 30; -fx-pref-height: 30;
+    -fx-effect: none;
+}
+.button.icon-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.55), linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.0) 60%), -g-hl;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)), rgba(40, 60, 110, 0.10);
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.20), 10, 0.0, 0, 3);
+}
+.button.icon-button:pressed { -fx-background-color: rgba(40, 60, 110, 0.08), transparent, -g-hl; -fx-effect: none; }
+.button.danger-hover:hover {
+    -fx-background-color: rgba(255, 225, 232, 0.80), linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.0) 60%), -g-hl;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 200, 212, 0.9)), rgba(217, 63, 92, 0.22);
+}
+
+/* pílula de alternância (Ajustar, Chat) */
+.toggle-button.chip-toggle {
+    -fx-padding: 4 11 4 11;
+    -fx-font-size: 12px;
+    -fx-background-radius: 11, 11, 11;
+    -fx-border-radius: 11, 12;
+}
+.toggle-button.chip-toggle:selected {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.40), rgba(74, 210, 246, 0.40)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.25) 100%),
+        -g-hl;
+    -fx-border-color: linear-gradient(to bottom right, #45e2ad, #41c9f4), rgba(37, 191, 238, 0.22);
+    -fx-text-fill: -g-accent-ink;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.42), 12, 0.0, 0, 2);
+}
+.toggle-button.chip-toggle:selected .icon-path { -fx-stroke: -g-accent-ink; }
+
+/* ==========================================================================
+   CABEÇALHO — barra de vidro flutuante
+   ========================================================================== */
+
+.header-host { -fx-padding: 14 14 0 14; }
+.header { -fx-padding: 9 14 9 14; }
+.logo-mark {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.78),
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.45), rgba(74, 210, 246, 0.30) 50%, rgba(240, 110, 205, 0.36));
+    -fx-background-radius: 10, 10;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.10);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 10, 11;
+    -fx-min-width: 28; -fx-min-height: 28; -fx-pref-width: 28; -fx-pref-height: 28;
+    -fx-max-width: 28; -fx-max-height: 28;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 12, 0.0, 0, 3);
+}
+.logo-mark .icon-path { -fx-stroke: #0a5f66; }
+.app-name { -fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.header-separator { -fx-background-color: linear-gradient(to bottom, transparent, rgba(30, 45, 80, 0.20), transparent); }
+
+/* indicadores: pequenas cápsulas leitosas com um ponto de luz */
+.doc-chip {
+    -fx-background-color: rgba(255, 255, 255, 0.50), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-background-radius: 13, 13;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.5)), rgba(40, 60, 110, 0.07);
+    -fx-border-width: 1.1, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 13, 14;
+    -fx-padding: 4 12 4 10;
+}
+.doc-chip .chip-tag { -fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: -g-text-3; }
+.doc-chip .chip-name { -fx-text-fill: -g-text; }
+.doc-chip .chip-state { -fx-font-size: 12px; -fx-text-fill: -g-text-2; }
+.chip-dot { -fx-fill: rgba(28, 30, 36, 0.28); }
+.doc-chip.level-ok .chip-dot { -fx-fill: #20d394; -fx-effect: dropshadow(gaussian, rgba(32, 211, 148, 0.95), 8, 0.25, 0, 0); }
+.doc-chip.level-working .chip-dot { -fx-fill: #25bfee; -fx-effect: dropshadow(gaussian, rgba(37, 191, 238, 0.95), 8, 0.25, 0, 0); }
+.doc-chip.level-warning .chip-dot { -fx-fill: #f0a81e; -fx-effect: dropshadow(gaussian, rgba(240, 168, 30, 0.90), 8, 0.25, 0, 0); }
+.doc-chip.level-error .chip-dot { -fx-fill: #ee5f7e; -fx-effect: dropshadow(gaussian, rgba(238, 95, 126, 0.90), 8, 0.25, 0, 0); }
+.doc-chip.level-error .chip-state { -fx-text-fill: -g-danger; }
+
+/* ==========================================================================
+   ÁREA PRINCIPAL E DIVISORES
+   ========================================================================== */
+
+.main-split, .documents-split { -fx-background-color: transparent; -fx-padding: 0; }
+.main-split { -fx-padding: 14 14 14 14; }
+.split-pane > .split-pane-divider { -fx-background-color: transparent; -fx-padding: 0 6 0 6; }
+.split-pane > .split-pane-divider:hover {
+    -fx-background-color: linear-gradient(to right, transparent, rgba(37, 191, 238, 0.30), transparent);
+}
+
+/* ==========================================================================
+   DOCUMENTO — painel de vidro; a área do PDF é SÓLIDA
+   ========================================================================== */
+
+.doc-panel { -fx-padding: 1.4; }
+.doc-panel.drag-over {
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.35);
+    -fx-border-width: 2, 1;
+}
+.doc-header {
+    -fx-padding: 11 12 10 15;
+    -fx-background-color: rgba(255, 255, 255, 0.34), linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.0));
+    -fx-background-radius: 20.5 20.5 0 0, 20.5 20.5 0 0;
+    -fx-border-color: transparent transparent -g-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.slot-badge {
+    -fx-background-color: rgba(255, 255, 255, 0.70), linear-gradient(to bottom right, rgba(92, 240, 190, 0.30), rgba(74, 210, 246, 0.26));
+    -fx-background-radius: 8, 8;
+    -fx-border-color: rgba(255, 255, 255, 0.95);
+    -fx-border-radius: 8;
+    -fx-text-fill: -g-accent-ink;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+    -fx-padding: 3 8 3 8;
+}
+.doc-name { -fx-font-size: 13.5px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.doc-state { -fx-font-size: 11.5px; -fx-text-fill: -g-text-2; }
+
+/* área do PDF: opaca, sem transparência nem efeito (legibilidade das páginas) */
+.viewer-host { -fx-background-color: #e9edf3; }
+.viewer-message { -fx-text-fill: -g-text-2; -fx-padding: 24; -fx-text-alignment: center; }
+
+.doc-toolbar {
+    -fx-padding: 8 12 9 12;
+    -fx-background-color: rgba(255, 255, 255, 0.34), linear-gradient(to top, rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.0));
+    -fx-background-radius: 0 0 20.5 20.5, 0 0 20.5 20.5;
+    -fx-border-color: -g-line transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.tool-group { -fx-alignment: center-left; }
+.zoom-label { -fx-min-width: 44; -fx-alignment: center; -fx-text-fill: -g-text; -fx-font-size: 12.5px; }
+
+/* campos: vidro afundado */
+.page-field, .text-field, .password-field {
+    -fx-background-color: rgba(255, 255, 255, 0.62), linear-gradient(to bottom, rgba(40, 60, 110, 0.055), rgba(255, 255, 255, 0.0) 55%);
+    -fx-background-radius: 11, 11;
+    -fx-border-color: linear-gradient(to bottom, rgba(40, 60, 110, 0.16), rgba(255, 255, 255, 0.95)), transparent;
+    -fx-border-width: 1.1, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 11, 12;
+    -fx-text-fill: -g-text;
+    -fx-prompt-text-fill: -g-text-3;
+    -fx-highlight-fill: rgba(60, 215, 220, 0.38);
+    -fx-highlight-text-fill: -g-text;
+    -fx-padding: 6 10 6 10;
+}
+.page-field { -fx-alignment: center; -fx-pref-width: 52; -fx-padding: 4 6 4 6; }
+.page-field:focused, .text-field:focused, .password-field:focused {
+    -fx-background-color: rgba(255, 255, 255, 0.85), transparent;
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.25);
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 14, 0.0, 0, 0);
+}
+
+/* área de soltar PDF */
+.drop-zone-box {
+    -fx-background-color: rgba(255, 255, 255, 0.55), linear-gradient(to bottom, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.0) 55%), -g-hl;
+    -fx-background-radius: 22, 22, 22;
+    -fx-border-color: rgba(30, 45, 80, 0.26);
+    -fx-border-radius: 22;
+    -fx-border-width: 1.3;
+    -fx-border-style: dashed;
+    -fx-cursor: hand;
+    -fx-padding: 14;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.14), 18, 0.0, 0, 6);
+}
+.drop-zone-box:hover { -fx-border-color: #2fc6e6; }
+.drop-zone-box.active {
+    -fx-background-color: linear-gradient(to bottom right, rgba(92, 240, 190, 0.30), rgba(74, 210, 246, 0.30)), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%), -g-hl;
+    -fx-border-color: #25bfee;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.60), 26, 0.0, 0, 0);
+}
+.drop-zone-box .icon-path { -fx-stroke: linear-gradient(to bottom right, #19c98a, #1fb4ea); }
+.drop-zone-title { -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: -g-text; -fx-text-alignment: center; }
+.drop-zone-hint { -fx-text-fill: -g-text-2; -fx-text-alignment: center; }
+
+/* ==========================================================================
+   CHAT
+   ========================================================================== */
+
+.chat-panel { -fx-padding: 1.4; }
+.chat-header {
+    -fx-padding: 11 12 10 15;
+    -fx-background-color: rgba(255, 255, 255, 0.34), linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.0));
+    -fx-background-radius: 20.5 20.5 0 0, 20.5 20.5 0 0;
+    -fx-border-color: transparent transparent -g-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.chat-title { -fx-font-size: 13.5px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.chat-scroll, .chat-scroll > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+.message-list { -fx-padding: 14 14 14 14; }
+.empty-state { -fx-padding: 20; }
+.empty-title { -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: -g-text-2; }
+.empty-hint { -fx-text-fill: -g-text-3; -fx-text-alignment: center; }
+
+/* mensagens: usuário = vidro com luz verde→ciano; IA = vidro leitoso */
+.bubble { -fx-padding: 10 13 10 13; }
+.bubble.user {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(108, 242, 198, 0.50) 0%, rgba(96, 216, 248, 0.50) 100%),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.18) 100%);
+    -fx-background-radius: 18 18 6 18, 18 18 6 18;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)), rgba(20, 160, 170, 0.20);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 18 18 6 18, 19 19 7 19;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.30), 14, 0.0, 0, 4);
+}
+.bubble.assistant {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.66),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.0) 40%);
+    -fx-background-radius: 18 18 18 6, 18 18 18 6;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.085);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 18 18 18 6, 19 19 19 7;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.14), 14, 0.0, 0, 4);
+}
+.bubble.assistant.error {
+    -fx-background-color: rgba(255, 232, 237, 0.82), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 45%);
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 205, 216, 0.9)), rgba(217, 63, 92, 0.24);
+}
+.bubble-sender { -fx-font-size: 10.5px; -fx-font-weight: 700; -fx-text-fill: -g-text-3; }
+.bubble.user .bubble-sender { -fx-text-fill: rgba(5, 58, 58, 0.62); }
+.bubble-text { -fx-text-fill: -g-text; }
+.bubble-footer { -fx-padding: 2 0 0 0; }
+.bubble-meta { -fx-font-size: 11px; -fx-text-fill: -g-text-3; }
+.bubble-stopped { -fx-font-size: 11px; -fx-text-fill: -g-warning; }
+.bubble-error-text { -fx-text-fill: -g-danger; }
+.bubble-error .icon-path { -fx-stroke: -g-danger; }
+.bubble-copy { -fx-min-width: 24; -fx-min-height: 24; -fx-pref-width: 24; -fx-pref-height: 24; -fx-padding: 4; }
+.bubble-refs { -fx-padding: 3 0 0 0; }
+.avatar {
+    -fx-background-color: rgba(255, 255, 255, 0.80), linear-gradient(to bottom right, rgba(92, 240, 190, 0.40), rgba(74, 210, 246, 0.28) 55%, rgba(240, 110, 205, 0.34));
+    -fx-background-radius: 14, 14;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.09);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 14, 15;
+    -fx-min-width: 28; -fx-min-height: 28; -fx-pref-width: 28; -fx-pref-height: 28;
+    -fx-max-width: 28; -fx-max-height: 28;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.40), 10, 0.0, 0, 2);
+}
+.avatar .icon-path { -fx-stroke: #0a6f72; }
+
+/* carregamento: três pontos de luz */
+.pulse-dot { -fx-fill: linear-gradient(to bottom right, #22d494, #25bfee); -fx-effect: dropshadow(gaussian, rgba(37, 200, 215, 0.85), 6, 0.2, 0, 0); }
+
+/* aviso de erro antes de começar a conversa */
+.error-banner {
+    -fx-background-color: rgba(255, 228, 234, 0.78), linear-gradient(to bottom, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.0));
+    -fx-border-color: rgba(217, 63, 92, 0.22) transparent rgba(217, 63, 92, 0.14) transparent;
+    -fx-border-width: 1 0 1 0;
+    -fx-padding: 9 12 9 14;
+}
+.error-banner .icon-path { -fx-stroke: -g-danger; }
+.error-banner-text { -fx-text-fill: -g-text; }
+
+/* referências: pequenas cápsulas de vidro */
+.references-bar {
+    -fx-padding: 9 14 9 14;
+    -fx-border-color: -g-line transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.muted-small { -fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: -g-text-3; }
+.ref-chip {
+    -fx-background-color: rgba(255, 255, 255, 0.66), linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.0) 60%), -g-hl;
+    -fx-background-radius: 12, 12, 12;
+    -fx-border-color: linear-gradient(to bottom right, rgba(63, 224, 168, 0.75), rgba(60, 200, 244, 0.75)), transparent;
+    -fx-border-width: 1.1, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 12, 13;
+    -fx-padding: 3 10 3 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.12), 6, 0.0, 0, 2);
+}
+.ref-chip:hover { -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 12, 0.0, 0, 3); }
+.ref-chip .label { -fx-font-size: 12px; -fx-text-fill: -g-accent-ink; }
+.ref-chip .icon-path { -fx-stroke: -g-accent-ink; }
+
+/* campo de mensagem: vidro afundado, integrado ao painel */
+.composer { -fx-padding: 11 13 14 13; }
+.composer-hint { -fx-font-size: 11px; -fx-text-fill: -g-text-3; }
+.text-area {
+    -fx-background-color: rgba(255, 255, 255, 0.62), linear-gradient(to bottom, rgba(40, 60, 110, 0.055), rgba(255, 255, 255, 0.0) 40%);
+    -fx-background-radius: 15, 15;
+    -fx-border-color: linear-gradient(to bottom, rgba(40, 60, 110, 0.16), rgba(255, 255, 255, 0.95)), transparent;
+    -fx-border-width: 1.1, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 15, 16;
+    -fx-text-fill: -g-text;
+    -fx-prompt-text-fill: -g-text-3;
+    -fx-highlight-fill: rgba(60, 215, 220, 0.38);
+    -fx-highlight-text-fill: -g-text;
+}
+.text-area:focused {
+    -fx-background-color: rgba(255, 255, 255, 0.86), transparent;
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.25);
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.52), 18, 0.0, 0, 0);
+}
+.text-area .content { -fx-background-color: transparent; -fx-padding: 9 12 9 12; }
+.text-area .scroll-pane, .text-area .viewport { -fx-background-color: transparent; }
+
+/* enviar: pequeno gradiente luminoso; parar: vidro neutro */
+.send-button {
+    -fx-min-width: 42; -fx-min-height: 42; -fx-pref-width: 42; -fx-pref-height: 42;
+    -fx-padding: 0;
+    -fx-background-radius: 15, 15, 15;
+    -fx-border-radius: 15, 16;
+}
+.button.primary.send-button {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(72, 236, 178, 0.96) 0%, rgba(58, 204, 246, 0.96) 62%, rgba(214, 130, 240, 0.92) 100%),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.10) 46%, rgba(255, 255, 255, 0.0) 54%, rgba(255, 255, 255, 0.18) 100%),
+        -g-hl;
+}
+.button.primary.send-button.stop {
+    -fx-background-color: rgba(255, 255, 255, 0.70), linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.0) 55%), -g-hl;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)), rgba(40, 60, 110, 0.12);
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.20), 10, 0.0, 0, 3);
+}
+.send-button.stop .icon-path { -fx-stroke: -g-text; -fx-fill: -g-text; }
+
+/* ==========================================================================
+   SELETOR (menu flutuante), ROLAGEM, DICAS, AVISOS
+   ========================================================================== */
+
+.combo-box-base, .combo-box {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.56),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.25) 48%, rgba(255, 255, 255, 0.0) 52%, rgba(255, 255, 255, 0.28) 100%),
+        -g-hl;
+    -fx-background-radius: 12, 12, 12;
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)), rgba(40, 60, 110, 0.11);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 12, 13;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.16), 9, 0.0, 0, 2.5);
+}
+.combo-box:hover { -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.26), 14, 0.0, 0, 5); }
+.combo-box:focused, .combo-box:showing {
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.25);
+}
+.combo-box .list-cell { -fx-background-color: transparent; -fx-text-fill: -g-text; -fx-padding: 5 4 5 11; }
+.combo-box .arrow-button { -fx-background-color: transparent; -fx-padding: 0 9 0 4; }
+.combo-box .arrow { -fx-background-color: rgba(28, 30, 36, 0.60); }
+.combo-box:disabled { -fx-opacity: 0.45; }
+
+.combo-box-popup > .list-view {
+    -fx-background-color:
+        rgba(252, 253, 255, 0.94),
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.10), transparent 45%, rgba(240, 110, 205, 0.08));
+    -fx-background-radius: 15, 15;
+    -fx-border-color: rgba(255, 255, 255, 1.0), rgba(40, 60, 110, 0.12);
+    -fx-border-width: 1.4, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 15, 16;
+    -fx-padding: 5;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.34), 24, 0.0, 0, 9);
+}
+.combo-box-popup > .list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #1c1e24;
+    -fx-padding: 7 11 7 11;
+    -fx-background-radius: 10;
+}
+.combo-box-popup > .list-view .list-cell:filled:hover { -fx-background-color: rgba(40, 60, 110, 0.07); }
+.combo-box-popup > .list-view .list-cell:filled:selected {
+    -fx-background-color: linear-gradient(to right, rgba(92, 240, 190, 0.38), rgba(74, 210, 246, 0.38));
+    -fx-text-fill: #053a3a;
+}
+.combo-box-popup > .list-view .list-cell:disabled { -fx-opacity: 0.45; }
+
+.scroll-bar { -fx-background-color: transparent; -fx-padding: 2; }
+.scroll-bar > .track, .scroll-bar > .track-background { -fx-background-color: transparent; -fx-border-color: transparent; }
+.scroll-bar > .thumb { -fx-background-color: rgba(30, 45, 80, 0.20); -fx-background-radius: 6; }
+.scroll-bar > .thumb:hover { -fx-background-color: rgba(30, 45, 80, 0.36); }
+.scroll-bar > .increment-button, .scroll-bar > .decrement-button { -fx-padding: 0; -fx-pref-height: 0; -fx-pref-width: 0; -fx-opacity: 0; }
+.scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow { -fx-padding: 0; }
+.scroll-bar:vertical { -fx-pref-width: 12; }
+.scroll-bar:horizontal { -fx-pref-height: 12; }
+.scroll-pane > .corner { -fx-background-color: transparent; }
+
+.tooltip {
+    -fx-background-color: rgba(252, 253, 255, 0.96);
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(40, 60, 110, 0.14);
+    -fx-border-radius: 10;
+    -fx-text-fill: #1c1e24;
+    -fx-font-size: 12px;
+    -fx-padding: 5 10 5 10;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.28), 12, 0.0, 0, 4);
+}
+
+.toast {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.86),
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.14), transparent 45%, rgba(240, 110, 205, 0.10));
+    -fx-background-radius: 17, 17;
+    -fx-border-color: rgba(255, 255, 255, 1.0), rgba(40, 60, 110, 0.11);
+    -fx-border-width: 1.4, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 17, 18;
+    -fx-padding: 11 17 11 15;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.36), 28, 0.0, 0, 10);
+}
+.toast .label { -fx-text-fill: #1c1e24; }
+.toast.warning .icon-path { -fx-stroke: #c98a12; }
+.toast.error .icon-path { -fx-stroke: #d93f5c; }
+.toast.success .icon-path { -fx-stroke: #12a873; }
+.toast.info .icon-path { -fx-stroke: #1aa6d6; }
+
+.splash-title { -fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.progress-indicator { -fx-progress-color: #25bfee; }
+
+/* ==========================================================================
+   MARKDOWN (dentro das mensagens)
+   ========================================================================== */
+
+.md-root { -fx-padding: 0; }
+.md-paragraph { -fx-line-spacing: 2.5; }
+.md-text { -fx-fill: -g-text; }
+.md-bold { -fx-font-weight: bold; }
+.md-italic { -fx-font-style: italic; }
+.md-inline-code { -fx-font-family: "Cascadia Mono", "Consolas", monospace; -fx-fill: #b02a86; -fx-font-size: 12px; }
+.md-link { -fx-fill: #1583b8; -fx-underline: true; }
+.md-ref { -fx-fill: -g-accent-ink; -fx-font-weight: 600; -fx-underline: false; }
+.md-ref:hover { -fx-underline: true; }
+.md-heading { -fx-padding: 4 0 0 0; }
+.md-h1 .md-text, .md-h1 .md-bold { -fx-font-size: 18px; -fx-font-weight: bold; }
+.md-h2 .md-text, .md-h2 .md-bold { -fx-font-size: 16px; -fx-font-weight: bold; }
+.md-h3 .md-text, .md-h3 .md-bold { -fx-font-size: 14px; -fx-font-weight: bold; }
+.md-h4 .md-text, .md-h4 .md-bold { -fx-font-size: 13px; -fx-font-weight: bold; -fx-fill: -g-text-2; }
+.md-rule { -fx-background-color: linear-gradient(to right, transparent, rgba(30, 45, 80, 0.20), transparent); -fx-min-height: 1; -fx-pref-height: 1; -fx-max-height: 1; }
+.md-list-marker { -fx-text-fill: -g-text-2; -fx-min-width: 16; -fx-alignment: top-right; }
+.md-quote-bar { -fx-background-color: linear-gradient(to bottom, #2fd9a0, #33c3f0); -fx-background-radius: 2; }
+.md-quote-text .md-text { -fx-fill: -g-text-2; -fx-font-style: italic; }
+
+.md-code-block {
+    -fx-background-color: rgba(246, 248, 252, 0.90), linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.0) 30%);
+    -fx-background-radius: 12, 12;
+    -fx-border-color: rgba(255, 255, 255, 1.0), rgba(40, 60, 110, 0.11);
+    -fx-border-width: 1.1, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 12, 13;
+}
+.md-code-header { -fx-padding: 4 6 4 12; -fx-border-color: transparent transparent -g-line transparent; -fx-border-width: 0 0 1 0; }
+.md-code-lang { -fx-font-size: 10.5px; -fx-text-fill: -g-text-3; }
+.md-code-body { -fx-padding: 10 12 10 12; }
+.md-code-text { -fx-font-family: "Cascadia Mono", "Consolas", monospace; -fx-font-size: 12px; -fx-fill: #272b36; }
+.md-copy { -fx-min-width: 22; -fx-min-height: 22; -fx-pref-width: 22; -fx-pref-height: 22; -fx-padding: 3; }
+
+.md-table { -fx-background-color: rgba(255, 255, 255, 0.55); -fx-background-radius: 10; -fx-border-color: rgba(40, 60, 110, 0.13); -fx-border-radius: 10; }
+.md-cell { -fx-padding: 6 10 6 10; -fx-border-color: rgba(40, 60, 110, 0.085); -fx-border-width: 0 1 1 0; }
+.md-cell-header { -fx-background-color: linear-gradient(to right, rgba(92, 240, 190, 0.20), rgba(74, 210, 246, 0.20)); }
+.md-cell-body { -fx-background-color: transparent; }
+
+/* ==========================================================================
+   CONFIGURAÇÕES
+   ========================================================================== */
+
+.settings-root { -fx-background-color: transparent; }
+.settings-header { -fx-padding: 22 26 14 26; }
+.settings-title { -fx-font-size: 19px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.settings-body { -fx-padding: 6 22 14 22; }
+.settings-section { -fx-padding: 15 16 15 16; }
+.section-title { -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.field-label { -fx-font-size: 11.5px; -fx-font-weight: 700; -fx-text-fill: -g-text-2; }
+.muted-info { -fx-font-size: 12px; -fx-text-fill: -g-text-3; }
+.settings-footer {
+    -fx-padding: 12 22 16 22;
+    -fx-background-color: rgba(255, 255, 255, 0.40);
+    -fx-border-color: rgba(255, 255, 255, 0.95) transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.security-note { -fx-padding: 4 6 0 6; }
+
+.result-box { -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-width: 1; }
+.result-ok { -fx-background-color: rgba(214, 250, 234, 0.85); -fx-border-color: rgba(18, 168, 115, 0.35); -fx-text-fill: -g-text; }
+.result-error { -fx-background-color: rgba(255, 228, 234, 0.88); -fx-border-color: rgba(217, 63, 92, 0.32); -fx-text-fill: -g-text; }
+.result-info { -fx-background-color: rgba(218, 244, 253, 0.88); -fx-border-color: rgba(37, 191, 238, 0.40); -fx-text-fill: -g-text; }
+
+/* ==========================================================================
+   BARRA LATERAL — painel de vidro flutuante; recolhida mostra só os ícones
+   ========================================================================== */
+
+.sidebar-host { -fx-padding: 14 0 14 14; }
+.sidebar { -fx-padding: 14 10 12 10; -fx-alignment: top-left; }
+.sidebar:collapsed { -fx-alignment: top-center; }
+.sidebar-brand { -fx-padding: 4 6 16 6; }
+.sidebar:collapsed .sidebar-brand { -fx-padding: 4 0 16 0; }
+
+/* item de navegação: vidro com luz verde→ciano quando selecionado */
+.toggle-button.nav-item {
+    -fx-alignment: center-left;
+    -fx-padding: 10 14 10 14;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 14, 14, 14;
+    -fx-border-radius: 14, 15;
+}
+.sidebar:collapsed .toggle-button.nav-item { -fx-alignment: center; -fx-padding: 10 0 10 0; }
+.toggle-button.nav-item:focused {
+    -fx-border-color: linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)), rgba(40, 60, 110, 0.11);
+}
+.toggle-button.nav-item:selected {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.40), rgba(74, 210, 246, 0.40)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.26) 100%),
+        -g-hl;
+    -fx-border-color: linear-gradient(to bottom right, #45e2ad, #41c9f4), rgba(37, 191, 238, 0.22);
+    -fx-text-fill: -g-accent-ink;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.42), 14, 0.0, 0, 3);
+}
+.toggle-button.nav-item:selected .icon-path { -fx-stroke: -g-accent-ink; }
+
+.button.sidebar-collapse { -fx-min-width: 34; -fx-min-height: 34; -fx-pref-width: 34; -fx-pref-height: 34; }
+
+/* ==========================================================================
+   CRIAR EXERCÍCIOS — mesma linguagem Light Liquid Glass: vidro claro, luz verde→ciano só nos destaques,
+   verde/âmbar/vermelho suaves para acerto, atenção e erro.
+   ========================================================================== */
+
+.exercises-host { -fx-padding: 14; }
+.exercises-root { -fx-padding: 0; }
+.ex-toolbar {
+    -fx-padding: 14 22 12 22;
+    -fx-border-color: transparent transparent -g-line transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.ex-toolbar-title { -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.ex-scroll, .ex-scroll > .viewport { -fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0; }
+.ex-wrap { -fx-padding: 30 36 36 36; }
+.ex-centered { -fx-padding: 30; }
+
+/* ----- início ----- */
+.ex-title { -fx-font-size: 30px; -fx-font-weight: 800; -fx-text-fill: -g-text; }
+.ex-subtitle { -fx-font-size: 14px; -fx-text-fill: -g-text-2; -fx-line-spacing: 2; }
+.ex-empty { -fx-padding: 24 0 24 0; }
+
+/* cartões flutuantes dos PDFs carregados */
+.source-card {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.74),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.0) 62%);
+    -fx-background-radius: 16, 16;
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.085);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 16, 17;
+    -fx-padding: 8 18 8 8;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.22), 18, 0.0, 0, 6);
+}
+.source-thumb {
+    -fx-background-color: #ffffff, linear-gradient(to bottom right, rgba(92, 240, 190, 0.20), rgba(74, 210, 246, 0.20));
+    -fx-background-radius: 7, 7;
+    -fx-border-color: rgba(40, 60, 110, 0.12);
+    -fx-border-radius: 7;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.20), 6, 0.0, 0, 2);
+}
+.source-thumb .icon-path { -fx-stroke: -g-accent-ink; }
+.source-tag { -fx-font-size: 9.5px; -fx-font-weight: 700; -fx-text-fill: -g-text-3; }
+.source-name { -fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: -g-text; }
+.source-info { -fx-font-size: 11.5px; -fx-text-fill: -g-text-3; }
+.source-info.ready { -fx-text-fill: -g-accent-ink; }
+
+/* cards das modalidades */
+.mode-card {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.56),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.14) 40%, rgba(255, 255, 255, 0.0) 70%, rgba(255, 255, 255, 0.22) 100%),
+        linear-gradient(to bottom right, rgba(70, 235, 175, 0.12) 0%, transparent 46%, rgba(240, 110, 205, 0.10) 100%),
+        -g-hl;
+    -fx-background-radius: 24, 24, 24, 24;
+    -fx-border-color:
+        linear-gradient(to bottom right, rgba(255, 255, 255, 1.0) 0%, rgba(255, 255, 255, 0.55) 45%, rgba(255, 255, 255, 0.95) 100%),
+        rgba(40, 60, 110, 0.09);
+    -fx-border-width: 1.5, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 24, 25;
+    -fx-padding: 24 24 22 24;
+    -fx-cursor: hand;
+    -fx-min-height: 280;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.24), 26, 0.0, 0, 10);
+}
+.mode-card:hover { -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.46), 34, 0.0, 0, 12); }
+.mode-card:focused {
+    -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.30);
+}
+.mode-card:disabled { -fx-opacity: 0.5; -fx-cursor: default; }
+.mode-icon {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.95), rgba(74, 210, 246, 0.95)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.0) 55%);
+    -fx-background-radius: 27, 27;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 16, 0.0, 0, 5);
+}
+.mode-icon .icon-path { -fx-stroke: #053a3a; }
+.mode-title { -fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.mode-desc { -fx-font-size: 13.5px; -fx-text-fill: -g-text-2; -fx-line-spacing: 2; }
+.mode-point { -fx-font-size: 12.5px; -fx-text-fill: -g-text-2; }
+.mode-point-row .icon-path { -fx-stroke: -g-accent-ink; }
+.mode-cta { -fx-font-size: 13.5px; -fx-font-weight: 700; -fx-text-fill: -g-accent-ink; }
+.mode-cta-row .icon-path { -fx-stroke: -g-accent-ink; }
+
+/* ----- estados: carregando / erro / aviso ----- */
+.status-panel { -fx-padding: 24; }
+.status-orb {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.70),
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.45), rgba(74, 210, 246, 0.45)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-background-radius: 38, 38, 38;
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.5));
+    -fx-border-width: 1.4;
+    -fx-border-radius: 38;
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.42), 26, 0.0, 0, 8);
+}
+.status-orb .icon-path { -fx-stroke: -g-accent-ink; }
+.status-orb.tone-bad {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.70),
+        linear-gradient(to bottom right, rgba(255, 150, 170, 0.45), rgba(255, 120, 190, 0.35)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-effect: dropshadow(gaussian, rgba(238, 95, 126, 0.40), 26, 0.0, 0, 8);
+}
+.status-orb.tone-bad .icon-path { -fx-stroke: -g-danger; }
+.status-title { -fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.status-message { -fx-font-size: 13.5px; -fx-text-fill: -g-text-2; -fx-line-spacing: 2; }
+.inline-status { -fx-padding: 34 0 20 0; }
+
+/* ----- questão ----- */
+.ex-kind { -fx-font-size: 11.5px; -fx-font-weight: 700; -fx-text-fill: -g-text-3; }
+.difficulty-chip { -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 2 10 2 10; -fx-background-radius: 10; }
+.d-facil { -fx-background-color: rgba(214, 250, 234, 0.95); -fx-text-fill: #0b7a52; }
+.d-media { -fx-background-color: rgba(255, 243, 208, 0.95); -fx-text-fill: #8a5c05; }
+.d-dificil { -fx-background-color: rgba(255, 224, 236, 0.95); -fx-text-fill: #b02a58; }
+
+.statement-card {
+    -fx-background-color: rgba(255, 255, 255, 0.70), linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.0) 62%);
+    -fx-background-radius: 20, 20;
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.08);
+    -fx-border-width: 1.3, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 20, 21;
+    -fx-padding: 20 24 20 24;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.18), 20, 0.0, 0, 6);
+}
+.statement-card .md-text, .statement-card .md-bold { -fx-font-size: 16px; }
+
+/* alternativas */
+.option-button {
+    -fx-background-color:
+        rgba(255, 255, 255, 0.60),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.20) 50%, rgba(255, 255, 255, 0.0) 54%, rgba(255, 255, 255, 0.26) 100%),
+        -g-hl;
+    -fx-background-radius: 18, 18, 18;
+    -fx-border-color:
+        linear-gradient(to bottom, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.55)),
+        rgba(40, 60, 110, 0.11);
+    -fx-border-width: 1.3, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 18, 19;
+    -fx-padding: 13 18 13 14;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.16), 10, 0.0, 0, 3);
+}
+.option-button:hover { -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.28), 16, 0.0, 0, 6); }
+.option-button:focused { -fx-border-color: linear-gradient(to bottom right, #3fe0a8, #3cc8f4), rgba(37, 191, 238, 0.30); }
+.option-button:picked {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(92, 240, 190, 0.42), rgba(74, 210, 246, 0.42)),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.26) 100%),
+        -g-hl;
+    -fx-border-color: linear-gradient(to bottom right, #45e2ad, #41c9f4), rgba(37, 191, 238, 0.24);
+    -fx-effect: dropshadow(gaussian, rgba(48, 205, 215, 0.50), 18, 0.0, 0, 4);
+}
+.option-button:correct {
+    -fx-background-color: rgba(214, 250, 234, 0.92), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-border-color: #25d695, rgba(18, 168, 115, 0.25);
+    -fx-effect: dropshadow(gaussian, rgba(37, 214, 149, 0.40), 18, 0.0, 0, 4);
+    -fx-cursor: default;
+}
+.option-button:wrong {
+    -fx-background-color: rgba(255, 228, 234, 0.94), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-border-color: #ee5f7e, rgba(217, 63, 92, 0.25);
+    -fx-effect: dropshadow(gaussian, rgba(238, 95, 126, 0.36), 18, 0.0, 0, 4);
+    -fx-cursor: default;
+}
+.option-button:dim { -fx-opacity: 0.66; -fx-cursor: default; -fx-effect: none; }
+.option-letter {
+    -fx-background-color: rgba(255, 255, 255, 0.85);
+    -fx-background-radius: 15;
+    -fx-border-color: rgba(40, 60, 110, 0.16);
+    -fx-border-radius: 15;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -g-text-2;
+}
+.option-button:picked .option-letter { -fx-background-color: linear-gradient(to bottom right, #5cf0be, #4ad2f6); -fx-border-color: transparent; -fx-text-fill: #053a3a; }
+.option-button:correct .option-letter { -fx-background-color: #25d695; -fx-border-color: transparent; -fx-text-fill: white; }
+.option-button:wrong .option-letter { -fx-background-color: #ee5f7e; -fx-border-color: transparent; -fx-text-fill: white; }
+.option-text { -fx-font-size: 14px; -fx-text-fill: -g-text; }
+.option-explanation { -fx-font-size: 12.5px; -fx-text-fill: -g-text-2; -fx-padding: 2 0 0 0; }
+.option-button:correct .icon-path { -fx-stroke: -g-success; }
+.option-button:wrong .icon-path { -fx-stroke: -g-danger; }
+
+.muted-info { -fx-font-size: 12px; -fx-text-fill: -g-text-3; }
+.inline-error { -fx-text-fill: -g-danger; -fx-font-size: 12.5px; -fx-padding: 0 2 0 2; }
+.answer-area { -fx-font-size: 14px; }
+.answer-area .content { -fx-padding: 14 16 14 16; }
+.answer-area { -fx-background-radius: 18, 18; -fx-border-radius: 18, 19; }
+
+/* ----- correção ----- */
+.verdict-banner {
+    -fx-padding: 18 24 18 22;
+    -fx-background-radius: 20, 20;
+    -fx-border-radius: 20, 21;
+    -fx-border-width: 1.3, 1;
+    -fx-border-insets: 0, -1;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.16), 18, 0.0, 0, 5);
+}
+.verdict-banner.correct {
+    -fx-background-color: rgba(214, 250, 234, 0.92), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-border-color: rgba(37, 214, 149, 0.80), rgba(18, 168, 115, 0.15);
+}
+.verdict-banner.partial {
+    -fx-background-color: rgba(255, 244, 214, 0.94), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-border-color: rgba(240, 168, 30, 0.75), rgba(201, 138, 18, 0.15);
+}
+.verdict-banner.incorrect {
+    -fx-background-color: rgba(255, 228, 234, 0.94), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%);
+    -fx-border-color: rgba(238, 95, 126, 0.75), rgba(217, 63, 92, 0.15);
+}
+.verdict-title { -fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.verdict-detail { -fx-font-size: 13.5px; -fx-text-fill: -g-text-2; -fx-line-spacing: 2; }
+.verdict-banner.correct .icon-path { -fx-stroke: -g-success; }
+.verdict-banner.incorrect .icon-path { -fx-stroke: -g-danger; }
+
+.score-track { -fx-stroke: rgba(30, 45, 80, 0.10); }
+.score-arc { -fx-stroke: linear-gradient(to bottom right, #25d695, #25bfee); }
+.score-ring.partial .score-arc { -fx-stroke: linear-gradient(to bottom right, #f5b83a, #f08a3c); }
+.score-ring.incorrect .score-arc { -fx-stroke: linear-gradient(to bottom right, #ee5f7e, #ee5fc4); }
+.score-value { -fx-font-size: 27px; -fx-font-weight: 800; -fx-text-fill: -g-text; }
+.score-of { -fx-font-size: 10.5px; -fx-text-fill: -g-text-3; }
+
+.ex-card {
+    -fx-background-color: rgba(255, 255, 255, 0.66), linear-gradient(to bottom, rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.0) 60%);
+    -fx-background-radius: 18, 18;
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 1.0), rgba(255, 255, 255, 0.6)), rgba(40, 60, 110, 0.08);
+    -fx-border-width: 1.2, 1;
+    -fx-border-insets: 0, -1;
+    -fx-border-radius: 18, 19;
+    -fx-padding: 15 18 16 18;
+    -fx-effect: dropshadow(gaussian, rgba(52, 72, 128, 0.14), 14, 0.0, 0, 4);
+}
+.ex-card.tone-ok { -fx-background-color: rgba(222, 251, 238, 0.82), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%); }
+.ex-card.tone-warn { -fx-background-color: rgba(255, 246, 221, 0.86), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%); }
+.ex-card.tone-bad { -fx-background-color: rgba(255, 234, 239, 0.86), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%); }
+.ex-card.tone-info { -fx-background-color: rgba(224, 246, 254, 0.84), linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.0) 60%); }
+.ex-card-title { -fx-font-size: 13.5px; -fx-font-weight: 700; -fx-text-fill: -g-text; }
+.ex-card.tone-ok .ex-card-title .icon-path, .ex-card.tone-ok .icon-path { -fx-stroke: -g-success; }
+.ex-card.tone-warn .icon-path { -fx-stroke: -g-warning; }
+.ex-card.tone-bad .icon-path { -fx-stroke: -g-danger; }
+.ex-card.tone-info .icon-path { -fx-stroke: #1583b8; }
+.point-text { -fx-font-size: 13px; -fx-text-fill: -g-text; -fx-line-spacing: 1.5; }
+.fix-concept { -fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -g-danger; }
+.criterion-chip {
+    -fx-background-color: rgba(255, 255, 255, 0.85);
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(40, 60, 110, 0.12);
+    -fx-border-radius: 12;
+    -fx-padding: 4 11 4 11;
+    -fx-font-size: 12px;
+    -fx-text-fill: -g-text-2;
+}
+.ex-end-actions { -fx-padding: 6 0 0 0; }
