@@ -111,6 +111,27 @@ public final class ScreenshotScript {
                                 + "' caret=" + field.getCaretPosition());
                     }
                 }
+                case "hover" -> {
+                    // move o cursor (sintetico) sobre um no: hover:#id=0.3,0.5 (fracoes da largura/altura)
+                    int eq = arg.indexOf('=');
+                    Node target = find(scene, arg.substring(0, eq));
+                    String[] f = arg.substring(eq + 1).split(",");
+                    if (target != null) {
+                        hover(target, Double.parseDouble(f[0]), Double.parseDouble(f[1]));
+                    }
+                    delay = 50;
+                }
+                case "leave" -> {
+                    Node target = find(scene, arg);
+                    if (target != null) {
+                        fireMouse(target, javafx.scene.input.MouseEvent.MOUSE_EXITED_TARGET, 0, 0);
+                    }
+                    delay = 50;
+                }
+                case "liquid-demo" -> {
+                    openLiquidDemo();
+                    delay = 800;
+                }
                 case "scroll" -> {
                     // rola um ScrollPane até uma fração (0 = topo, 1 = fim): scroll:#id=0.5
                     int eq = arg.indexOf('=');
@@ -143,6 +164,59 @@ public final class ScreenshotScript {
         PauseTransition pause = new PauseTransition(Duration.millis(Math.max(delay, 50)));
         pause.setOnFinished(e -> next(stage, scene, steps));
         pause.play();
+    }
+
+    private static final java.util.Set<Node> HOVERED = new java.util.HashSet<>();
+
+    /** Cursor sintetico: entra no no (uma vez) e move para a fracao (fx, fy) do seu tamanho. */
+    private static void hover(Node target, double fx, double fy) {
+        var b = target.getLayoutBounds();
+        var p = target.localToScene(fx * b.getWidth(), fy * b.getHeight());
+        if (HOVERED.add(target)) {
+            fireMouse(target, javafx.scene.input.MouseEvent.MOUSE_ENTERED_TARGET, p.getX(), p.getY());
+        }
+        fireMouse(target, javafx.scene.input.MouseEvent.MOUSE_MOVED, p.getX(), p.getY());
+    }
+
+    private static void fireMouse(Node target, javafx.event.EventType<javafx.scene.input.MouseEvent> type,
+                                  double sceneX, double sceneY) {
+        if (type == javafx.scene.input.MouseEvent.MOUSE_EXITED_TARGET) {
+            HOVERED.remove(target);
+        }
+        javafx.event.Event.fireEvent(target, new javafx.scene.input.MouseEvent(type, sceneX, sceneY, sceneX, sceneY,
+                javafx.scene.input.MouseButton.NONE, 0, false, false, false, false, false, false, false, true, false,
+                false, null));
+    }
+
+    /** Janela de demonstracao: botoes de vidro liquido sobre listras e texto (um fundo com detalhe para a refracao). */
+    private static void openLiquidDemo() {
+        javafx.scene.layout.Pane stripes = new javafx.scene.layout.Pane();
+        for (int i = 0; i < 40; i++) {
+            javafx.scene.shape.Rectangle r = new javafx.scene.shape.Rectangle(i * 22, 0, 11, 400);
+            r.setFill(i % 2 == 0 ? javafx.scene.paint.Color.web("#2a3350") : javafx.scene.paint.Color.web("#f0b44c"));
+            stripes.getChildren().add(r);
+        }
+        javafx.scene.control.Label big = new javafx.scene.control.Label("REFRAÇÃO 123 abc");
+        big.setStyle("-fx-font-size: 44px; -fx-font-weight: 800; -fx-text-fill: white;");
+        javafx.scene.control.Button normal = new javafx.scene.control.Button("Botão de vidro");
+        normal.setId("demoNormal");
+        javafx.scene.control.Button primary = new javafx.scene.control.Button("Primário");
+        primary.getStyleClass().add("primary");
+        primary.setId("demoPrimary");
+        javafx.scene.control.ToggleButton toggle = new javafx.scene.control.ToggleButton("Alternar");
+        toggle.setId("demoToggle");
+        javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(30, normal, primary, toggle);
+        row.setAlignment(javafx.geometry.Pos.CENTER);
+        javafx.scene.layout.StackPane root = new javafx.scene.layout.StackPane(stripes, big, row);
+        javafx.scene.layout.StackPane.setAlignment(big, javafx.geometry.Pos.TOP_CENTER);
+        javafx.scene.Scene demo = new javafx.scene.Scene(root, 640, 260);
+        demo.getStylesheets().add(com.estudotron.controller.ViewLoader.stylesheet());
+        com.estudotron.component.GlassMotion.install(demo);
+        com.estudotron.component.LiquidGlass.install(demo);
+        Stage stage = new Stage();
+        stage.setTitle("Demo vidro líquido");
+        stage.setScene(demo);
+        stage.show();
     }
 
     /** Localiza um nó por "#id" ou "#id[n]" (n-ésima ocorrência). */

@@ -3,6 +3,7 @@ package com.estudotron;
 import com.estudotron.backend.ApiClient;
 import com.estudotron.backend.BackendManager;
 import com.estudotron.component.GlassMotion;
+import com.estudotron.component.LiquidGlass;
 import com.estudotron.controller.MainController;
 import com.estudotron.controller.ViewLoader;
 import com.estudotron.dev.ScreenshotScript;
@@ -40,6 +41,7 @@ public final class App extends Application {
         scene.setFill(Color.web("#f3f5f9"));
         scene.getStylesheets().add(ViewLoader.stylesheet());
         GlassMotion.install(scene);
+        LiquidGlass.install(scene);
         stage.setTitle(AppInfo.NAME);
         stage.setMinWidth(MIN_WIDTH);
         stage.setMinHeight(MIN_HEIGHT);

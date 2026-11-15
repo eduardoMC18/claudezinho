@@ -6,6 +6,7 @@ import com.estudotron.backend.ChatDtos.ConnectionTestDto;
 import com.estudotron.backend.ChatDtos.ModelDto;
 import com.estudotron.backend.ChatDtos.ProviderDto;
 import com.estudotron.component.GlassMotion;
+import com.estudotron.component.LiquidGlass;
 import com.estudotron.component.Icons;
 import com.estudotron.component.Icons.Icon;
 import com.estudotron.service.NotificationService;
@@ -82,6 +83,7 @@ public final class SettingsController {
         scene.setFill(Color.web("#f3f5f9"));
         scene.getStylesheets().add(ViewLoader.stylesheet());
         GlassMotion.install(scene);
+        LiquidGlass.install(scene);
         stage.setScene(scene);
         stage.setMinWidth(520);
         stage.setMinHeight(520);
