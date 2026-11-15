@@ -11,7 +11,6 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.ButtonBase;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
@@ -149,14 +148,7 @@ public final class AmbientBackground extends Pane {
     }
 
     private static boolean overButton(EventTarget target) {
-        Node node = target instanceof Node n ? n : null;
-        while (node != null) {
-            if (node instanceof ButtonBase) {
-                return true;
-            }
-            node = node.getParent();
-        }
-        return false;
+        return LiquidGlass.isOverLiquid(target);   // botões e cartões com vidro líquido
     }
 
     // ------------------------------------------------------------------ layout e quadros

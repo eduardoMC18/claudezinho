@@ -2,6 +2,7 @@ package com.estudotron.component;
 
 import javafx.animation.AnimationTimer;
 import javafx.event.EventTarget;
+import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
@@ -17,6 +18,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.transform.Transform;
@@ -40,7 +42,13 @@ import javafx.scene.transform.Transform;
  * </ol>
  *
  * <p>Instalado uma vez por cena ({@link #install(Scene)}); vale para todo {@link ButtonBase} (botões e botões
- * de alternância) cujo pai seja um {@code Pane}. Botões com a classe {@code no-liquid} ficam de fora.
+ * de alternância) e para os cartões de vidro da interface (ver {@link #CARD_CLASSES}: cards de modalidade, caixas
+ * dos PDFs, alternativas, enunciado, cartões de correção, chips...), desde que o pai seja um {@code Pane}. Nós com a
+ * classe {@code no-liquid} ficam de fora, e os grandes demais (painéis com os PDFs) também.
+ *
+ * <p>Para nós grandes o campo de deformação é calculado numa grade mais grossa ({@link LiquidSurface#stepFor}), o
+ * que mantém o custo por quadro baixo. Se o nó se mover enquanto está ativo (rolagem, relayout), a captura deixa de
+ * valer e é refeita no próximo movimento do mouse.
  */
 public final class LiquidGlass {
 
@@ -48,6 +56,12 @@ public final class LiquidGlass {
     private static final String ACTIVE_CLASS = "liquid-active";
     private static final String OPT_OUT = "no-liquid";
     private static final int MARGIN = 16;
+    /** Acima disto (px²) o nó é grande demais (painel inteiro): não recebe o efeito. */
+    private static final double MAX_AREA = 260_000;
+    /** Cartões de vidro, além dos botões, que recebem a refração. */
+    public static final java.util.Set<String> CARD_CLASSES = java.util.Set.of(
+            "mode-card", "source-card", "option-button", "statement-card", "ex-card", "verdict-banner",
+            "doc-chip", "ref-chip", "criterion-chip", "bubble", "drop-zone-box");
     private static final double DEFAULT_RADIUS = 12;
     /** -Destudotron.liquid.debug=true: imprime o custo medio por quadro ao fim de cada interacao. */
     private static final boolean DEBUG = Boolean.getBoolean("estudotron.liquid.debug");
@@ -57,11 +71,13 @@ public final class LiquidGlass {
     /** Liga o efeito a todos os botões da cena (inclusive os criados depois), no primeiro hover de cada um. */
     public static void install(Scene scene) {
         scene.addEventFilter(MouseEvent.MOUSE_ENTERED_TARGET, event -> {
-            ButtonBase button = findButton(event.getTarget());
+            Region button = findTarget(event.getTarget());
             if (button == null || button.getProperties().containsKey(PROP)) {
                 return;
             }
-            if (!(button.getParent() instanceof Pane) || button.getStyleClass().contains(OPT_OUT)) {
+            double area = button.getLayoutBounds().getWidth() * button.getLayoutBounds().getHeight();
+            if (!(button.getParent() instanceof Pane) || button.getStyleClass().contains(OPT_OUT)
+                    || area > MAX_AREA) {
                 button.getProperties().put(PROP, Boolean.FALSE);   // sem suporte: não tenta de novo
                 return;
             }
@@ -71,21 +87,39 @@ public final class LiquidGlass {
         });
     }
 
-    private static ButtonBase findButton(EventTarget target) {
+    /** O botão ou cartão de vidro mais próximo (subindo a partir do alvo do evento), ou null. */
+    private static Region findTarget(EventTarget target) {
         Node node = target instanceof Node n ? n : null;
         while (node != null) {
-            if (node instanceof ButtonBase button) {
-                return button;
+            if (node instanceof Region region && isLiquid(region)) {
+                return region;
             }
             node = node.getParent();
         }
         return null;
     }
 
-    /** Estado e animação de UM botão. */
+    private static boolean isLiquid(Region region) {
+        if (region instanceof ButtonBase) {
+            return true;
+        }
+        for (String styleClass : region.getStyleClass()) {
+            if (CARD_CLASSES.contains(styleClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** true se o nó (ou um ancestral) é um botão/cartão com vidro líquido (o fundo usa isto para desacelerar). */
+    public static boolean isOverLiquid(EventTarget target) {
+        return findTarget(target) != null;
+    }
+
+    /** Estado e animação de UM botão ou cartão. */
     private static final class Refraction {
 
-        private final ButtonBase button;
+        private final Region button;
         private final Pane refractLayer = new Pane();
         private final Pane lightLayer = new Pane();
         private final ImageView refractView = new ImageView();
@@ -96,7 +130,12 @@ public final class LiquidGlass {
         private LiquidSurface surface;
         private WritableImage lightImage;
         private int[] lightPixels;
+        private float[] fullX;
+        private float[] fullY;
+        private long frameCount;
         private boolean installed;
+        private double originX;
+        private double originY;
 
         // cursor-alvo e cursor suavizado (coordenadas locais do botão), velocidade, reatividade, pressão
         private double targetX;
@@ -113,7 +152,7 @@ public final class LiquidGlass {
         private long computeNanos;
         private long frames;
 
-        Refraction(ButtonBase button) {
+        Refraction(Region button) {
             this.button = button;
             for (Pane layer : new Pane[] {refractLayer, lightLayer}) {
                 layer.setManaged(false);
@@ -207,7 +246,7 @@ public final class LiquidGlass {
             if (scene == null || parent == null || w < 8 || h < 8) {
                 return false;
             }
-            Bounds onScene = button.localToScene(button.getLayoutBounds());
+            Bounds onScene = layoutBoundsOnScene();   // sem a escala do hover: a captura e a camada têm de coincidir
             double scale = scene.getWindow() != null ? Math.max(1, scene.getWindow().getOutputScaleX()) : 1;
 
             // margem de captura, limitada à cena
@@ -227,22 +266,39 @@ public final class LiquidGlass {
             // o botão (e as camadas, se já existiram) ficam transparentes só durante a captura, no mesmo pulso
             double previous = button.getOpacity();
             button.setOpacity(0);
+            // As sombras grandes dos painéis (DropShadow) saem do snapshot: ao recortar uma região, o efeito trata a borda
+            // do recorte como a borda da forma e desenha uma sombra falsa no canto (visível em cartões grandes).
+            // Elas só existem FORA dos painéis, então não fazem falta atrás de um botão ou cartão.
+            java.util.List<Node> hidden = new java.util.ArrayList<>();
+            for (Node shadow : scene.getRoot().lookupAll(".glass-shadow")) {
+                if (shadow.isVisible()) {
+                    shadow.setVisible(false);
+                    hidden.add(shadow);
+                }
+            }
             WritableImage backdrop;
             try {
                 backdrop = scene.getRoot().snapshot(params, null);
             } finally {
                 button.setOpacity(previous);
+                hidden.forEach(n -> n.setVisible(true));
             }
 
-            surface = new LiquidSurface((int) Math.round(w), (int) Math.round(h), cornerRadius(), left, top, right, bottom);
+            int step = LiquidSurface.stepFor((int) Math.round(w), (int) Math.round(h));
+            surface = new LiquidSurface((int) Math.round(w), (int) Math.round(h), cornerRadius(), left, top, right,
+                    bottom, step);
+            originX = onScene.getMinX();
+            originY = onScene.getMinY();
             refractView.setImage(backdrop);
             refractView.setFitWidth(surface.imageWidth());
             refractView.setFitHeight(surface.imageHeight());
             refractView.setLayoutX(-left);
             refractView.setLayoutY(-top);
 
-            lightPixels = new int[(int) Math.round(w) * (int) Math.round(h)];
-            lightImage = new WritableImage((int) Math.round(w), (int) Math.round(h));
+            lightPixels = new int[surface.lightWidth() * surface.lightHeight()];
+            fullX = new float[surface.imageWidth() * surface.imageHeight()];
+            fullY = new float[surface.imageWidth() * surface.imageHeight()];
+            lightImage = new WritableImage(surface.lightWidth(), surface.lightHeight());
             lightView.setImage(lightImage);
             lightView.setFitWidth(Math.round(w));
             lightView.setFitHeight(Math.round(h));
@@ -280,6 +336,17 @@ public final class LiquidGlass {
                 }
             }
             return DEFAULT_RADIUS;
+        }
+
+        /**
+         * Retângulo de layout do nó na cena, SEM escala nem deslocamento de animação (o GlassMotion amplia botões e
+         * cartões em 1,5% no hover; isso não pode contar como "o nó se moveu").
+         */
+        private Bounds layoutBoundsOnScene() {
+            Bounds layout = button.getLayoutBounds();
+            var topLeft = button.getParent().localToScene(button.getLayoutX() + layout.getMinX(),
+                    button.getLayoutY() + layout.getMinY());
+            return new BoundingBox(topLeft.getX(), topLeft.getY(), layout.getWidth(), layout.getHeight());
         }
 
         private void syncPosition() {
@@ -356,9 +423,29 @@ public final class LiquidGlass {
                 teardown();
                 return;
             }
+            Bounds now0 = layoutBoundsOnScene();
+            if (Math.abs(now0.getMinX() - originX) > 1.5 || Math.abs(now0.getMinY() - originY) > 1.5) {
+                // o nó andou (rolagem, relayout): o fundo capturado não coincide mais. Recapta no próximo movimento.
+                if (DEBUG) {
+                    System.out.printf("[liquid] no se moveu: dx=%.2f dy=%.2f%n", now0.getMinX() - originX, now0.getMinY() - originY);
+                }
+                teardown();
+                return;
+            }
             syncPosition();
             long started = System.nanoTime();
-            render();
+            // nós grandes (mapa com mais de ~60 mil pixels) atualizam a cada 2 quadros (30 fps): a deformação é lenta
+            if (surface.imageWidth() * surface.imageHeight() <= 60_000 || (frameCount++ & 1) == 0) {
+                try {
+                    render();
+                } catch (RuntimeException e) {
+                    if (DEBUG) {
+                        e.printStackTrace(System.out);
+                    }
+                    teardown();
+                    return;
+                }
+            }
             computeNanos += System.nanoTime() - started;
             frames++;
         }
@@ -368,17 +455,19 @@ public final class LiquidGlass {
 
             int iw = surface.imageWidth();
             int ih = surface.imageHeight();
+            // o FloatMap não é esticado: precisa ter a resolução da imagem (o campo grosso é expandido por interpolação)
+            surface.expand(fullX, fullY);
             FloatMap map = new FloatMap(iw, ih);
+            int k = 0;
             for (int j = 0; j < ih; j++) {
-                for (int i = 0; i < iw; i++) {
-                    // o mapa usa deslocamentos normalizados pelo tamanho da imagem
-                    map.setSamples(i, j, surface.offsetX(i, j) / iw, surface.offsetY(i, j) / ih);
+                for (int i = 0; i < iw; i++, k++) {
+                    map.setSamples(i, j, fullX[k] / iw, fullY[k] / ih);   // deslocamentos normalizados
                 }
             }
             displacement.setMapData(map);
 
-            int w = (int) lightImage.getWidth();
-            int h = (int) lightImage.getHeight();
+            int w = surface.lightWidth();
+            int h = surface.lightHeight();
             surface.lighting(lightPixels, strength);
             lightImage.getPixelWriter().setPixels(0, 0, w, h, PixelFormat.getIntArgbInstance(), lightPixels, 0, w);
         }

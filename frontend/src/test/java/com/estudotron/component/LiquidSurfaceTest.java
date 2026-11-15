@@ -162,4 +162,65 @@ class LiquidSurfaceTest {
             assertEquals(0, p >>> 24);
         }
     }
+
+    @Test
+    void coarseGridExpandsToTheSameFieldAsFullResolution() {
+        int w = 480;
+        int h = 330;
+        int step = LiquidSurface.stepFor(w, h);
+        assertTrue(step > 1, "cartão grande usa grade grossa: " + step);
+        LiquidSurface fine = new LiquidSurface(w, h, 24, M, M, M, M, 1);
+        LiquidSurface coarse = new LiquidSurface(w, h, 24, M, M, M, M, step);
+        fine.compute(360, 230, 120, -40, 1, 0.5);
+        coarse.compute(360, 230, 120, -40, 1, 0.5);
+
+        int iw = fine.imageWidth();
+        int ih = fine.imageHeight();
+        float[] fx = new float[iw * ih];
+        float[] fy = new float[iw * ih];
+        float[] cx = new float[iw * ih];
+        float[] cy = new float[iw * ih];
+        fine.expand(fx, fy);
+        coarse.expand(cx, cy);
+        // só conta o que aparece: dentro do cartão (o recorte esconde a fronteira e os cantos arredondados)
+        double worst = 0;
+        double sum = 0;
+        int counted = 0;
+        for (int y = M + 3; y < M + h - 3; y++) {
+            for (int x = M + 3; x < M + w - 3; x++) {
+                boolean corner = (x < M + 24 || x > M + w - 24) && (y < M + 24 || y > M + h - 24);
+                if (corner) {
+                    continue;
+                }
+                int i = y * iw + x;
+                double d = Math.hypot(fx[i] - cx[i], fy[i] - cy[i]);
+                worst = Math.max(worst, d);
+                sum += d;
+                counted++;
+            }
+        }
+        assertTrue(sum / counted < 0.25, "erro médio pequeno (px): " + sum / counted);
+        assertTrue(worst < 3.0, "pior erro (px) dentro do cartão: " + worst);
+    }
+
+    @Test
+    void lensAloneNeverShadesTheInteriorOfALargeCard() {
+        // cursor fora do cartão: só rim e lente. O interior (longe da borda) deve ficar sem reflexo nem sombra.
+        int w = 480;
+        int h = 330;
+        int step = LiquidSurface.stepFor(w, h);
+        LiquidSurface card = new LiquidSurface(w, h, 24, M, M, M, M, step);
+        card.compute(5000, 5000, 0, 0, 1, 0);
+        int[] argb = new int[card.lightWidth() * card.lightHeight()];
+        card.lighting(argb, 1);
+        int shaded = 0;
+        for (int y = 20 / step; y < (h - 20) / step; y++) {
+            for (int x = 20 / step; x < (w - 20) / step; x++) {
+                if ((argb[y * card.lightWidth() + x] >>> 24) > 3) {
+                    shaded++;
+                }
+            }
+        }
+        assertEquals(0, shaded, "a lente sozinha não pode sombrear o interior do cartão");
+    }
 }
