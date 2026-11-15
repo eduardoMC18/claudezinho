@@ -1,128 +1,352 @@
 package com.estudotron.component;
 
-import javafx.animation.PauseTransition;
-import javafx.beans.property.ReadOnlyObjectProperty;
-import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.geometry.Rectangle2D;
+import com.estudotron.component.FlowField.Band;
+import com.estudotron.component.FlowField.Strand;
+import com.estudotron.component.FlowField.Tint;
+import javafx.animation.AnimationTimer;
+import javafx.beans.value.ChangeListener;
+import javafx.event.EventHandler;
+import javafx.event.EventTarget;
+import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.effect.GaussianBlur;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.image.WritableImage;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
-import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Rectangle;
-import javafx.scene.transform.Transform;
-import javafx.util.Duration;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.stage.Window;
+
+import java.lang.management.ManagementFactory;
 
 /**
- * Fundo do Liquid Glass: um ambiente quase branco, limpo, com uma variação de luz muito suave (mais claro
- * no canto superior esquerdo, cinza-claríssimo no oposto). Sem formas decorativas: a profundidade vem das
- * placas de vidro, não do fundo.
+ * "Liquid Flow Background": um ambiente branco com fios de vidro fluidos, faixas de luz, reflexos iridescentes
+ * discretos e linhas de construção finas. Existe para dar ao vidro algo para refratar: os fios e as linhas
+ * atravessam (inclusive) as regiões onde ficam os botões, e os painéis de vidro, translúcidos, deixam vê-los.
  *
- * <p><b>Desfoque do que está atrás do vidro.</b> O JavaFX não tem backdrop blur. Como este fundo é estático,
- * ele é capturado em baixa resolução, desfocado uma única vez e publicado em {@link #frostProperty()}.
- * Cada {@link GlassCard} mostra o pedaço dessa imagem que fica exatamente atrás dele (levemente ampliado,
- * como uma lente), sem custo por quadro: só é refeito quando a janela muda de tamanho.
+ * <p><b>Desenho.</b> Duas camadas de {@link Canvas}: a fixa (linhas de construção, cruzes, pontos) é desenhada só
+ * quando a janela muda de tamanho; a animada (fios e faixas) é redesenhada a 20 quadros por segundo, com o tempo
+ * acumulado de forma contínua (movimento lento, 1 a 2 minutos por ciclo).
+ *
+ * <p><b>Economia.</b> Não anima com a janela sem foco, minimizada ou oculta. E, enquanto o cursor está sobre um
+ * botão, o movimento desacelera até parar (e volta devagar ao sair): o vidro líquido captura o que há atrás do
+ * botão ao entrar, e com o fundo parado essa imagem continua coincidindo com o que está em volta.
+ *
+ * <p>O fundo fica atrás de tudo e não intercepta o mouse.
  */
 public final class AmbientBackground extends Pane {
 
-    /** Escala da captura (1/4 da resolução: o desfoque esconde a diferença e fica 16x mais barato). */
-    private static final double FROST_SCALE = 0.25;
-    private static final double FROST_BLUR = 8; // em pixels da captura reduzida (~32 px reais)
+    private static final long FRAME_NANOS = 50_000_000L;   // 20 quadros por segundo
+    private static final double STEP = 10;                 // espaçamento horizontal das amostras das curvas
+    private static final boolean DEBUG = Boolean.getBoolean("estudotron.bg.debug");
+    /** Em testes automatizados a janela pode não ter foco: -Destudotron.bg.alwaysAnimate=true ignora isso. */
+    private static final boolean ALWAYS = Boolean.getBoolean("estudotron.bg.alwaysAnimate");
 
-    private record Glow(double fx, double fy, double radius, Color color, double alpha) {}
+    private static final Color SILVER = Color.rgb(100, 116, 148);
 
-    /** Luz ambiente discreta: uma fonte branca no topo e um toque frio e quase imperceptível no canto oposto. */
-    private static final Glow[] GLOWS = {
-            new Glow(0.25, 0.05, 700, Color.web("#ffffff"), 0.90),
-            new Glow(1.00, 1.00, 700, Color.web("#c9d2e2"), 0.22),
-    };
-
+    private final FlowField field = new FlowField(42);
     private final Region base = new Region();
-    private final Circle[] glows = new Circle[GLOWS.length];
-    private final ReadOnlyObjectWrapper<Image> frost = new ReadOnlyObjectWrapper<>();
-    private final PauseTransition debounce = new PauseTransition(Duration.millis(140));
+    private final Canvas fixedLayer = new Canvas();
+    private final Canvas flowLayer = new Canvas();
+    private final AnimationTimer timer;
+
+    private double time;
+    private double timeScale = 1;
+    private double targetScale = 1;
+    private long last;
+    private boolean windowActive = true;
+    private double[] xs = new double[0];
+    private double[] ys = new double[0];
+
+    // medição (só com -Destudotron.bg.debug=true)
+    private long drawNanos;
+    private long drawnFrames;
+    private long reportedAt;
+
+    private final EventHandler<MouseEvent> pointerHandler = this::onPointer;
+    private final EventHandler<MouseEvent> leaveHandler = e -> targetScale = 1;
+    private final ChangeListener<Boolean> activityListener = (obs, old, value) -> updateActivity();
+    private Window observedWindow;
 
     public AmbientBackground() {
         getStyleClass().add("ambient");
         base.getStyleClass().add("ambient-base");
-        getChildren().add(base);
-
-        for (int i = 0; i < GLOWS.length; i++) {
-            Glow g = GLOWS[i];
-            Circle circle = new Circle(g.radius());
-            circle.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, alpha(g.color(), g.alpha())),
-                    new Stop(0.55, alpha(g.color(), g.alpha() * 0.45)),
-                    new Stop(1.0, alpha(g.color(), 0))));
-            circle.setManaged(false);
-            glows[i] = circle;
-            getChildren().add(circle);
+        getChildren().addAll(base, fixedLayer, flowLayer);
+        for (Node layer : new Node[] {base, fixedLayer, flowLayer}) {
+            layer.setManaged(false);
+            layer.setMouseTransparent(true);
         }
-
         setMouseTransparent(true);
         setMinSize(0, 0);
-        Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(widthProperty());
-        clip.heightProperty().bind(heightProperty());
-        setClip(clip);
 
-        debounce.setOnFinished(e -> renderFrost());
-        widthProperty().addListener((obs, old, w) -> debounce.playFromStart());
-        heightProperty().addListener((obs, old, h) -> debounce.playFromStart());
-        sceneProperty().addListener((obs, old, scene) -> debounce.playFromStart());
+        timer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                frame(now);
+            }
+        };
+        sceneProperty().addListener((obs, old, scene) -> attach(old, scene));
     }
 
-    /** O fundo desfocado (mesmas proporções da janela); null até a primeira captura. */
-    public ReadOnlyObjectProperty<Image> frostProperty() {
-        return frost.getReadOnlyProperty();
+    // ------------------------------------------------------------------ ciclo de vida
+
+    private void attach(Scene old, Scene scene) {
+        if (old != null) {
+            old.removeEventFilter(MouseEvent.MOUSE_MOVED, pointerHandler);
+            old.removeEventFilter(MouseEvent.MOUSE_DRAGGED, pointerHandler);
+            old.removeEventFilter(MouseEvent.MOUSE_EXITED, leaveHandler);
+        }
+        if (observedWindow != null) {
+            observedWindow.focusedProperty().removeListener(activityListener);
+            observedWindow.showingProperty().removeListener(activityListener);
+            observedWindow = null;
+        }
+        if (scene == null) {
+            timer.stop();
+            return;
+        }
+        // enquanto o cursor está sobre um botão, o fundo desacelera (ver a documentação da classe)
+        scene.addEventFilter(MouseEvent.MOUSE_MOVED, pointerHandler);
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, pointerHandler);
+        scene.addEventFilter(MouseEvent.MOUSE_EXITED, leaveHandler);
+        scene.windowProperty().addListener((obs, was, window) -> observe(window));
+        observe(scene.getWindow());
     }
 
-    /** Fundo ambiente da cena, se houver. */
-    public static AmbientBackground of(Scene scene) {
-        return scene != null && scene.getRoot().lookup(".ambient") instanceof AmbientBackground bg ? bg : null;
+    private void observe(Window window) {
+        if (observedWindow != null) {
+            observedWindow.focusedProperty().removeListener(activityListener);
+            observedWindow.showingProperty().removeListener(activityListener);
+        }
+        observedWindow = window;
+        if (window != null) {
+            window.focusedProperty().addListener(activityListener);
+            window.showingProperty().addListener(activityListener);
+        }
+        updateActivity();
     }
 
-    private static Color alpha(Color color, double alpha) {
-        return new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, Math.min(1, alpha)));
+    private void updateActivity() {
+        Window window = observedWindow;
+        boolean showing = window != null && window.isShowing();
+        boolean iconified = window instanceof javafx.stage.Stage stage && stage.isIconified();
+        windowActive = showing && !iconified && (ALWAYS || window.isFocused());
+        if (windowActive) {
+            last = 0;
+            timer.start();
+        } else {
+            timer.stop();
+        }
     }
+
+    private void onPointer(MouseEvent event) {
+        targetScale = overButton(event.getTarget()) ? 0 : 1;
+    }
+
+    private static boolean overButton(EventTarget target) {
+        Node node = target instanceof Node n ? n : null;
+        while (node != null) {
+            if (node instanceof ButtonBase) {
+                return true;
+            }
+            node = node.getParent();
+        }
+        return false;
+    }
+
+    // ------------------------------------------------------------------ layout e quadros
 
     @Override
     protected void layoutChildren() {
         double w = getWidth();
         double h = getHeight();
         base.resizeRelocate(0, 0, w, h);
-        for (int i = 0; i < glows.length; i++) {
-            glows[i].setCenterX(w * GLOWS[i].fx());
-            glows[i].setCenterY(h * GLOWS[i].fy());
+        if (w < 2 || h < 2) {
+            return;
+        }
+        boolean resized = fixedLayer.getWidth() != w || fixedLayer.getHeight() != h;
+        if (resized) {
+            fixedLayer.setWidth(w);
+            fixedLayer.setHeight(h);
+            flowLayer.setWidth(w);
+            flowLayer.setHeight(h);
+            xs = new double[(int) Math.ceil(w / STEP) + 3];
+            ys = new double[xs.length];
+            drawFixed();
+            drawFlow();
         }
     }
 
-    /** Captura o fundo em 1/4 da resolução e desfoca. Roda só quando a janela muda de tamanho. */
-    private void renderFrost() {
-        double w = getWidth();
-        double h = getHeight();
-        if (getScene() == null || w < 2 || h < 2) {
+    private void frame(long now) {
+        if (last == 0) {
+            last = now;
             return;
         }
-        SnapshotParameters small = new SnapshotParameters();
-        small.setTransform(Transform.scale(FROST_SCALE, FROST_SCALE));
-        small.setFill(Color.WHITE);
-        small.setViewport(new Rectangle2D(0, 0, Math.ceil(w * FROST_SCALE), Math.ceil(h * FROST_SCALE)));
-        WritableImage reduced = snapshot(small, null);
+        long elapsed = now - last;
+        if (elapsed < FRAME_NANOS) {
+            return;
+        }
+        last = now;
+        double dt = Math.min(elapsed / 1e9, 0.25);
+        // desacelera/retoma suavemente (constante de ~0,45 s), sem arranques bruscos
+        timeScale += (targetScale - timeScale) * (1 - Math.exp(-dt * 2.2));
+        if (timeScale < 0.003 && targetScale == 0) {
+            return;                       // parado: nenhum redesenho, custo zero
+        }
+        time += dt * timeScale;
+        long started = System.nanoTime();
+        drawFlow();
+        if (DEBUG) {
+            report(System.nanoTime() - started, now);
+        }
+    }
 
-        ImageView blurView = new ImageView(reduced);
-        blurView.setEffect(new GaussianBlur(FROST_BLUR));
-        SnapshotParameters crop = new SnapshotParameters();
-        crop.setFill(Color.WHITE);
-        crop.setViewport(new Rectangle2D(0, 0, reduced.getWidth(), reduced.getHeight()));
-        frost.set(blurView.snapshot(crop, null));
+    private void report(long nanos, long now) {
+        drawNanos += nanos;
+        drawnFrames++;
+        if (reportedAt == 0) {
+            reportedAt = now;
+        }
+        if (now - reportedAt > 5_000_000_000L) {
+            double cpu = -1;
+            try {
+                cpu = ((com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean())
+                        .getProcessCpuLoad() * 100;
+            } catch (Throwable ignored) {
+                // sem a extensão da JVM: só o tempo de desenho
+            }
+            System.out.printf("[fundo] %d quadros, desenho medio %.2f ms/quadro, CPU do processo %.1f%%%n",
+                    drawnFrames, drawNanos / 1e6 / drawnFrames, cpu);
+            drawNanos = 0;
+            drawnFrames = 0;
+            reportedAt = now;
+        }
+    }
+
+    // ------------------------------------------------------------------ desenho
+
+    /** Linhas de construção, cruzes e pontos: finos, nítidos, quase invisíveis; só redesenhados ao redimensionar. */
+    private void drawFixed() {
+        double w = fixedLayer.getWidth();
+        double h = fixedLayer.getHeight();
+        GraphicsContext gc = fixedLayer.getGraphicsContext2D();
+        gc.clearRect(0, 0, w, h);
+        gc.setLineWidth(1.4);
+        gc.setStroke(Color.rgb(84, 100, 136, 0.30));
+        for (double f : field.hairlinesH()) {
+            double y = Math.round(f * h) + 0.5;
+            gc.strokeLine(0, y, w, y);
+        }
+        for (double f : field.hairlinesV()) {
+            double x = Math.round(f * w) + 0.5;
+            gc.strokeLine(x, 0, x, h);
+        }
+        // nas interseções: cruzes pequenas e pontos, alternados
+        gc.setStroke(Color.rgb(72, 88, 122, 0.55));
+        gc.setFill(Color.rgb(72, 88, 122, 0.55));
+        int k = 0;
+        for (double fv : field.hairlinesV()) {
+            for (double fh : field.hairlinesH()) {
+                double x = Math.round(fv * w) + 0.5;
+                double y = Math.round(fh * h) + 0.5;
+                if ((k++ & 1) == 0) {
+                    gc.strokeLine(x - 7, y, x + 7, y);
+                    gc.strokeLine(x, y - 7, x, y + 7);
+                } else {
+                    gc.fillOval(x - 2, y - 2, 4, 4);
+                }
+            }
+        }
+        // dois contornos finos (linhas de construção, não manchas) numa interseção
+        double cx = Math.round(field.hairlinesV()[3] * w) + 0.5;
+        double cy = Math.round(field.hairlinesH()[4] * h) + 0.5;
+        gc.setStroke(Color.rgb(90, 106, 140, 0.24));
+        gc.strokeOval(cx - 58, cy - 58, 116, 116);
+        gc.strokeOval(cx - 112, cy - 112, 224, 224);
+    }
+
+    /** Faixas de luz e fios de vidro, no instante {@code time}. */
+    private void drawFlow() {
+        double w = flowLayer.getWidth();
+        double h = flowLayer.getHeight();
+        if (w < 2 || h < 2) {
+            return;
+        }
+        GraphicsContext gc = flowLayer.getGraphicsContext2D();
+        gc.clearRect(0, 0, w, h);
+        gc.setLineCap(StrokeLineCap.BUTT);
+
+        // faixas de luz: traços largos empilhados (prata muito suave por baixo, branco luminoso por cima)
+        for (Band band : field.bands()) {
+            Strand s = field.strands().get(band.strandIndex());
+            int n = sample(s, w, h);
+            gc.setStroke(Color.rgb(150, 164, 192, 0.045));
+            gc.setLineWidth(band.width() * 1.25);
+            gc.strokePolyline(xs, ys, n);
+            double[] widths = {band.width(), band.width() * 0.62, band.width() * 0.28};
+            double[] alphas = {band.alpha() * 0.45, band.alpha() * 0.60, band.alpha()};
+            for (int i = 0; i < widths.length; i++) {
+                gc.setStroke(Color.rgb(255, 255, 255, alphas[i]));
+                gc.setLineWidth(widths[i]);
+                gc.strokePolyline(xs, ys, n);
+            }
+        }
+
+        // reflexo iridescente: o gradiente (prata → ciano → prata → magenta → prata) desliza devagar ao longo do fio
+        double shift = -(time * 6) % (w * 1.8);
+        LinearGradient iridescent = new LinearGradient(shift, 0, shift + w * 0.9, 0, false, CycleMethod.REFLECT,
+                new Stop(0.00, Color.rgb(140, 156, 184, 0.34)),
+                new Stop(0.24, Color.rgb(70, 190, 232, 0.55)),
+                new Stop(0.50, Color.rgb(160, 172, 196, 0.40)),
+                new Stop(0.76, Color.rgb(228, 96, 198, 0.50)),
+                new Stop(1.00, Color.rgb(140, 156, 184, 0.34)));
+
+        for (Strand s : field.strands()) {
+            int n = sample(s, w, h);
+            if (s.tint() == Tint.TUBE) {
+                drawTube(gc, s, n);
+                continue;
+            }
+            switch (s.tint()) {
+                case WHITE -> gc.setStroke(Color.rgb(255, 255, 255, s.alpha()));
+                case IRIDESCENT -> gc.setStroke(iridescent);
+                default -> gc.setStroke(Color.color(SILVER.getRed(), SILVER.getGreen(), SILVER.getBlue(), s.alpha()));
+            }
+            gc.setLineWidth(s.width());
+            gc.strokePolyline(xs, ys, n);
+        }
+    }
+
+    /** Tubo de vidro: corpo prateado translúcido, aresta fina mais escura embaixo e núcleo branco de reflexo em cima. */
+    private void drawTube(GraphicsContext gc, Strand s, int n) {
+        gc.setStroke(Color.rgb(120, 136, 168, 0.16));
+        gc.setLineWidth(s.width());
+        gc.strokePolyline(xs, ys, n);
+        gc.save();
+        gc.translate(0, s.width() * 0.5);
+        gc.setStroke(Color.rgb(90, 106, 140, 0.34));
+        gc.setLineWidth(1);
+        gc.strokePolyline(xs, ys, n);                 // aresta inferior
+        gc.translate(0, -s.width());
+        gc.setStroke(Color.rgb(255, 255, 255, 0.92));
+        gc.setLineWidth(1.6);
+        gc.strokePolyline(xs, ys, n);                 // reflexo superior
+        gc.restore();
+    }
+
+    /** Amostra a curva do fio em {@link #xs}/{@link #ys}; devolve o número de pontos. */
+    private int sample(Strand s, double w, double h) {
+        int n = 0;
+        for (double x = -STEP; x <= w + STEP && n < xs.length; x += STEP) {
+            xs[n] = x;
+            ys[n] = FlowField.y(s, x, time, w, h);
+            n++;
+        }
+        return n;
     }
 }

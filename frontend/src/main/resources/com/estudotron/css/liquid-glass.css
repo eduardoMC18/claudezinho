@@ -80,11 +80,11 @@
     -fx-border-radius: 22, 21, 19;
 }
 
-/* barra flutuante: mais leitosa */
+/* barra flutuante: um pouco mais leitosa que o painel, mas ainda deixa ver os fios do fundo (é onde ficam os botões) */
 .glass-bar {
     -fx-background-color:
-        rgba(255, 255, 255, 0.34),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.70) 0%, rgba(255, 255, 255, 0.0) 80%),
+        rgba(255, 255, 255, 0.14),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.0) 70%),
         linear-gradient(from 0% 0% to 100% 100%, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.0) 30%, rgba(255, 255, 255, 0.20) 40%, rgba(255, 255, 255, 0.0) 50%, rgba(255, 255, 255, 0.0) 100%);
     -fx-background-radius: 22, 22, 22;
     -fx-border-color:
