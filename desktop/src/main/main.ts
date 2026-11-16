@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -95,7 +96,26 @@ async function shutdown(code?: number): Promise<void> {
   else app.quit();
 }
 
+/** Autoteste: gera PDFs de teste com o PyMuPDF do backend (pasta temporária). */
+let testPdfs: Record<string, string> | null = null;
+function makeTestPdfs(): Record<string, string> {
+  const backendDir = process.env.ESTUDOTRON_BACKEND_DIR ?? path.resolve(__dirname, '..', '..', '..', 'backend');
+  const venv = path.join(backendDir, '.venv', 'Scripts', 'python.exe');
+  const python = process.env.ESTUDOTRON_PYTHON ?? (fs.existsSync(venv) ? venv : 'python');
+  const script = path.resolve(__dirname, '..', '..', 'tools', 'make_test_pdfs.py');
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'estudotron-pdfs-'));
+  const stdout = execFileSync(python, [script, out], { encoding: 'utf8' });
+  return JSON.parse(stdout.trim().split('\n').pop()!);
+}
+
+ipcMain.handle('dialog:pickPdf', async () => {
+  const opts: Electron.OpenDialogOptions = { properties: ['openFile'], filters: [{ name: 'PDF', extensions: ['pdf'] }] };
+  const r = mainWindow ? await dialog.showOpenDialog(mainWindow, opts) : await dialog.showOpenDialog(opts);
+  return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
+});
+
 ipcMain.handle('app:info', () => ({
+  testPdfs,
   selfTest: SELFTEST,
   backendReady: backend !== null,
   backendPid: backend?.pid ?? null, // não é segredo
@@ -132,6 +152,7 @@ app.whenReady().then(async () => {
   if (SELFTEST) {
     process.env.ESTUDOTRON_DATA_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'estudotron-selftest-'));
     await startSseServer();
+    try { testPdfs = makeTestPdfs(); } catch (err) { console.error('Falha ao gerar PDFs de teste:', String(err)); }
   }
   try {
     backend = await startBackend();

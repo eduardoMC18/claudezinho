@@ -17,6 +17,8 @@ Frontend em **Electron + TypeScript** (React + Vite nas próximas etapas), com u
 
 - **Etapa 2** (`desktop/src/renderer`): React + Vite + TS; motor de vidro como módulo (Lens/Film/Solid), barra lateral e tela de Configurações com a API real; fallback CSS. Autoteste no Electron real (GPU real, backend real): motor iniciou e desenhou, 2 provedores e 7 modelos listados, escolha de modelo gravada, 300 quadros com média 16,67 ms / p95 16,8 ms / máx 16,9 ms (15 superfícies, cadência travada em 60 Hz, não tempo de GPU). Capturas em `docs/screenshots/electron-etapa2-*.png`.
 
+- **Etapa 3** (Leitor de PDFs): PDF.js 6.5 no Chromium com camada de texto, rolagem virtualizada, ajuste à largura, dois painéis independentes, substituir/remover, sessão restaurada. 27 checks no autoteste com PDFs reais gerados (24 págs., escaneado, 8 págs.), 0 falhas. Pendente de verificação humana: seletor nativo e arrastar-e-soltar real. Capturas `docs/screenshots/electron-etapa3-*.png`.
+
 ## Alternativas e por que ainda não decididas
 
 - **Tauri/WebView2:** mesmo motor Chromium no Windows, instalador menor, mas exige Rust e o WebView2 se atualiza sozinho (shader pode variar entre máquinas); em macOS cairia no WKWebView sem o efeito fiel. **Não foi medido**; deve ser comparado com o mesmo laboratório antes da decisão final.

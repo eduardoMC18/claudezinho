@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 /**
  * Ponte mínima e explícita. NÃO expõe token, porta do backend, Node, nem acesso a arquivos.
@@ -10,9 +10,15 @@ contextBridge.exposeInMainWorld('estudo', {
     backendReady: boolean;
     backendPid: number | null;
     windowVisible: boolean;
+    /** Só no autoteste: PDFs gerados para os testes. */
+    testPdfs: Record<string, string> | null;
     electron: string;
     chromium: string;
   }> => ipcRenderer.invoke('app:info'),
   reportSelfTest: (result: unknown): void => ipcRenderer.send('selftest:result', result),
   capture: (name: string): Promise<string | null> => ipcRenderer.invoke('selftest:capture', name),
+  /** Abre o seletor de arquivos do sistema (somente PDF). Retorna o caminho ou null se cancelado. */
+  pickPdf: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickPdf'),
+  /** Caminho no disco de um arquivo arrastado para a janela. */
+  pathForFile: (file: File): string => webUtils.getPathForFile(file),
 });

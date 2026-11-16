@@ -60,4 +60,39 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .model .price { color: var(--ink-3); font-size: 12px; }
 .loading { color: var(--ink-2); padding: 8px; }
 
+/* ---- Leitor de PDFs ---- */
+.main > .head + .reader { min-height: 0; }
+.reader { display: grid; min-height: 0; min-width: 0; padding: 0 2px 2px 0; }
+.divider { cursor: col-resize; position: relative; border-radius: 6px; }
+.divider::after { content: ""; position: absolute; left: 5px; top: 30%; bottom: 30%; width: 2px; border-radius: 2px; background: rgba(60, 62, 70, .25); transition: background .15s; }
+.divider:hover::after, .divider:focus-visible::after { background: rgba(60, 62, 70, .6); }
+
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 12px 12px; gap: 8px; }
+.pane.dragging { outline: 2px dashed rgba(31, 32, 35, .5); outline-offset: -6px; }
+.pane-bar { display: grid; gap: 8px; padding: 2px 6px 0; }
+.pane-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.doc-actions { display: flex; gap: 6px; margin-left: auto; flex: none; }
+.pane-title .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { font-size: var(--fs-small); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.ok { color: var(--success); }
+.status.warn { color: var(--warning); }
+.status.error { color: var(--danger); }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.btn.sq { width: 34px; padding: 0; font-size: 17px; }
+.pager { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.pager input { width: 42px; height: 30px; text-align: center; border: 0; border-radius: 15px; background: rgba(255, 255, 255, .65); box-shadow: inset 0 0 0 1px var(--line); }
+.zoom { min-width: 42px; text-align: center; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* Solid: as páginas ficam opacas e nítidas, sem refração */
+.pdf-scroller { flex: 1; min-height: 0; overflow: auto; background: var(--solid-2); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line); scrollbar-width: thin; scrollbar-color: rgba(60, 62, 70, .35) transparent; }
+.pdf-host { position: relative; }
+.pdf-page { position: relative; margin: 0 auto 12px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .18); }
+.pdf-host { padding: 0; }
+.pdf-page:first-child { margin-top: 14px; }
+.pdf-page canvas { display: block; }
+
+.drop { flex: 1; min-height: 0; margin: 4px 10px 10px; border: 2px dashed rgba(60, 62, 70, .35); border-radius: 18px; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--ink-2); cursor: pointer; white-space: pre-line; text-align: center; }
+.drop:hover { border-color: rgba(60, 62, 70, .6); color: var(--ink); }
+.drop small { color: var(--ink-3); }
+
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

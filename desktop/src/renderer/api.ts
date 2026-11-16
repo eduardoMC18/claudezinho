@@ -28,6 +28,32 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   return data as T;
 }
 
+// ---- Documentos / workspace ----
+
+export type SlotId = 'A' | 'B';
+
+export interface DocumentInfo {
+  id: string;
+  slot: SlotId;
+  name: string;
+  pages: number;
+  title: string | null;
+  /** processing | ready | no_text | error */
+  status: 'processing' | 'ready' | 'no_text' | 'error';
+  pages_done: number;
+  error: string | null;
+  /** ok | modified | missing */
+  file_state: 'ok' | 'modified' | 'missing';
+}
+
+export const workspace = {
+  get: () => api<{ slots: Record<SlotId, DocumentInfo | null> }>('/workspace'),
+  setSlot: (slot: SlotId, path: string) => api<DocumentInfo>(`/workspace/slots/${slot}`, { method: 'PUT', json: { path } }),
+  clearSlot: (slot: SlotId) => api<void>(`/workspace/slots/${slot}`, { method: 'DELETE' }),
+  document: (id: string) => api<DocumentInfo>(`/documents/${encodeURIComponent(id)}`),
+  fileUrl: (id: string) => `/api/documents/${encodeURIComponent(id)}/file`,
+};
+
 // ---- Configurações de IA (formato de GET /settings/ai) ----
 
 export interface ModelInfo {
