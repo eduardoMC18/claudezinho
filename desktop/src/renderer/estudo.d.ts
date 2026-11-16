@@ -6,6 +6,7 @@ interface EstudoBridge {
     backendPid: number | null;
     windowVisible: boolean;
     testPdfs: Record<string, string> | null;
+    fakeAi: boolean;
     electron: string;
     chromium: string;
   }>;

@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { workspace, type DocumentInfo, type SlotId } from '../api';
+import type { ChatApi } from '../chat/useChat';
 import { GlassButton } from '../ui/GlassButton';
-import { ViewerPane } from './ViewerPane';
+import { ChatPanel, type CiteTarget } from './ChatPanel';
+import { ViewerPane, type ViewerPaneHandle } from './ViewerPane';
 
 type Slots = Record<SlotId, DocumentInfo | null>;
 const EMPTY: Slots = { A: null, B: null };
 
-/** Leitor de PDFs: dois visualizadores independentes lado a lado, divisor ajustável, sessão restaurada do backend. */
-export function Reader() {
+/** Leitor de PDFs: dois visualizadores independentes lado a lado, divisor ajustável, chat à direita. */
+export function Reader({ chat }: { chat: ChatApi }) {
   const [slots, setSlots] = useState<Slots>(EMPTY);
   const [errors, setErrors] = useState<Record<SlotId, string | null>>({ A: null, B: null });
   const [ratio, setRatio] = useState(0.5);
+  const [showChat, setShowChat] = useState(true);
+  const [warning, setWarning] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
+  const pdfs = useRef<HTMLDivElement>(null);
+  const paneA = useRef<ViewerPaneHandle>(null);
+  const paneB = useRef<ViewerPaneHandle>(null);
 
   const setErr = (slot: SlotId, msg: string | null) => setErrors((e) => ({ ...e, [slot]: msg }));
 
@@ -45,6 +51,7 @@ export function Reader() {
     try {
       const doc = await workspace.setSlot(slot, path);
       setSlots((s) => ({ ...s, [slot]: doc }));
+      setWarning(null);
     } catch (e) {
       setErr(slot, (e as Error).message);
     }
@@ -71,9 +78,22 @@ export function Reader() {
     return () => { delete (window as unknown as { __reader?: unknown }).__reader; };
   }, [setPath, clear]);
 
+  /** Clique numa citação: leva o PDF à página; avisa se o documento foi substituído/removido desde a resposta. */
+  const onCite = useCallback((t: CiteTarget) => {
+    const doc = slots[t.slot];
+    const name = t.slot === 'A' ? 'PDF 1' : 'PDF 2';
+    if (!doc) { setWarning(`O ${name} foi removido desde esta resposta; a citação não pode ser aberta.`); return; }
+    if (t.documentId && t.documentId !== doc.id) {
+      setWarning(`O ${name} foi substituído desde esta resposta; a página ${t.page} pode não corresponder ao texto citado.`);
+      return;
+    }
+    setWarning(null);
+    (t.slot === 'A' ? paneA : paneB).current?.goToPage(t.page);
+  }, [slots]);
+
   // ---- divisor ----
   const dragFrom = (e: PointerEvent<HTMLDivElement>) => {
-    const box = wrap.current!.getBoundingClientRect();
+    const box = pdfs.current!.getBoundingClientRect();
     const move = (ev: globalThis.PointerEvent) => setRatio(Math.min(0.8, Math.max(0.2, (ev.clientX - box.left) / box.width)));
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
     window.addEventListener('pointermove', move);
@@ -85,30 +105,36 @@ export function Reader() {
     if (e.key === 'ArrowRight') setRatio((r) => Math.min(0.8, r + 0.02));
   };
 
+  const hasDocs = !!(slots.A || slots.B);
+
   return (
     <>
       <header className="head">
         <h1>Leitor de PDFs</h1>
         <GlassButton className="btn" variant="lens" radius={21} bevel={18} data-load="A" onClick={() => void pick('A')}>Carregar PDF 1</GlassButton>
         <GlassButton className="btn" variant="lens" radius={21} bevel={18} data-load="B" onClick={() => void pick('B')}>Carregar PDF 2</GlassButton>
+        <GlassButton className="btn" variant={showChat ? 'primary' : 'lens'} radius={21} bevel={18} data-action="toggle-chat" aria-pressed={showChat}
+          onClick={() => setShowChat((v) => !v)}>Chat</GlassButton>
       </header>
-      <div
-        ref={wrap}
-        className="reader"
-        data-loaded={loaded ? '1' : '0'}
-        style={{ gridTemplateColumns: `minmax(0, ${ratio}fr) 12px minmax(0, ${1 - ratio}fr)` }}
-      >
-        <ViewerPane slot="A" doc={slots.A} error={errors.A} onPick={pick} onPath={setPath} onClear={clear} />
+      <div className="reader" data-loaded={loaded ? '1' : '0'} data-chat={showChat ? '1' : '0'}>
         <div
-          className="divider"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Ajustar a largura dos PDFs"
-          tabIndex={0}
-          onPointerDown={dragFrom}
-          onKeyDown={keyDivider}
-        />
-        <ViewerPane slot="B" doc={slots.B} error={errors.B} onPick={pick} onPath={setPath} onClear={clear} />
+          ref={pdfs}
+          className="pdfs"
+          style={{ gridTemplateColumns: `minmax(0, ${ratio}fr) 12px minmax(0, ${1 - ratio}fr)` }}
+        >
+          <ViewerPane ref={paneA} slot="A" doc={slots.A} error={errors.A} onPick={pick} onPath={setPath} onClear={clear} />
+          <div
+            className="divider"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ajustar a largura dos PDFs"
+            tabIndex={0}
+            onPointerDown={dragFrom}
+            onKeyDown={keyDivider}
+          />
+          <ViewerPane ref={paneB} slot="B" doc={slots.B} error={errors.B} onPick={pick} onPath={setPath} onClear={clear} />
+        </div>
+        {showChat && <ChatPanel chat={chat} hasDocs={hasDocs} warning={warning} onCite={onCite} />}
       </div>
     </>
   );

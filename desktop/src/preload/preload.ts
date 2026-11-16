@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('estudo', {
     windowVisible: boolean;
     /** Só no autoteste: PDFs gerados para os testes. */
     testPdfs: Record<string, string> | null;
+    /** Só no autoteste: o backend aponta para o servidor de IA FALSO e usa cofre em memória. */
+    fakeAi: boolean;
     electron: string;
     chromium: string;
   }> => ipcRenderer.invoke('app:info'),

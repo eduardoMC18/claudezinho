@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent } from 'react';
 import type { DocumentInfo, SlotId } from '../api';
 import { workspace } from '../api';
 import { GlassButton } from '../ui/GlassButton';
@@ -30,8 +30,13 @@ function isPdf(f: File): boolean {
   return f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 }
 
-export function ViewerPane({ slot, doc, error, onPick, onPath, onClear }: Props) {
+export interface ViewerPaneHandle {
+  goToPage(n: number): void;
+}
+
+export const ViewerPane = forwardRef<ViewerPaneHandle, Props>(function ViewerPane({ slot, doc, error, onPick, onPath, onClear }, ref) {
   const view = useRef<PdfViewHandle>(null);
+  useImperativeHandle(ref, () => ({ goToPage: (n) => view.current?.goToPage(n) }), []);
   const [vs, setVs] = useState<ViewerState | null>(null);
   const [pageText, setPageText] = useState('1');
   const [dragging, setDragging] = useState(false);
@@ -39,7 +44,7 @@ export function ViewerPane({ slot, doc, error, onPick, onPath, onClear }: Props)
   const label = slot === 'A' ? 'PDF 1' : 'PDF 2';
 
   // o campo de página acompanha a rolagem
-  useEffect(() => { if (vs) setPageText(String(vs.page)); }, [vs?.page]);
+  useEffect(() => { if (vs) setPageText(String(vs.page)); }, [vs?.page, vs?.nav]);
   // trocar/remover o documento zera o estado do visualizador (nunca é compartilhado)
   useEffect(() => { setVs(null); setPageText('1'); }, [doc?.id]);
 
@@ -126,4 +131,4 @@ export function ViewerPane({ slot, doc, error, onPick, onPath, onClear }: Props)
       )}
     </GlassPanel>
   );
-}
+});

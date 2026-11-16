@@ -15,6 +15,8 @@ export interface ViewerState {
   fit: boolean;
   loading: boolean;
   error: string | null;
+  /** Contador de navegações explícitas (goToPage): força o campo de página a ressincronizar mesmo se a página não mudou. */
+  nav: number;
 }
 
 interface Slot {
@@ -41,7 +43,7 @@ const MAX_SCALE = 5;
  * Rolagem virtualizada: só as páginas perto da área visível têm canvas e camada de texto.
  */
 export class PdfController {
-  state: ViewerState = { page: 1, total: 0, scale: 1, fit: true, loading: false, error: null };
+  state: ViewerState = { page: 1, total: 0, scale: 1, fit: true, loading: false, error: null, nav: 0 };
 
   private pdf: PDFDocumentProxy | null = null;
   private task: PDFDocumentLoadingTask | null = null;
@@ -129,6 +131,7 @@ export class PdfController {
     if (!this.slots.length) return;
     const i = Math.min(Math.max(Math.round(n), 1), this.slots.length) - 1;
     this.scroller.scrollTop = this.tops[i] - 6;
+    this.set({ nav: this.state.nav + 1 }); // reemite: o campo de página volta a mostrar a página real
     this.schedule();
   }
 

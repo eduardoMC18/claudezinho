@@ -41,6 +41,18 @@ desktop/
 - CSP ampliada só no necessário: `wasm-unsafe-eval`, `worker-src 'self' blob:`, `font-src`/`img-src` com `blob:`/`data:`.
 - Autoteste gera PDFs com o PyMuPDF do backend (`tools/make_test_pdfs.py`): `texto.pdf` (24 págs., a 7ª em paisagem), `outro.pdf` (8) e `escaneado.pdf` (3, sem texto).
 
+## Etapa 4 — Chat com a IA
+
+- Painel à direita (~30% da largura, 320–460 px), botão **Chat** no cabeçalho oculta/mostra e os PDFs reajustam o zoom sozinhos. Estado em `chat/useChat.ts`, **no App** (uma resposta em andamento continua ao trocar de tela).
+- **Streaming real**: `POST /api/chat/stream` lido por `chat/sse.ts` (SSE sobre `fetch`, eventos `meta`, `delta`, `done`, `error`). **Parar** chama `POST /chat/messages/{id}/cancel` e mantém o texto parcial (status "interrompida"). Se a validação falhar antes de gravar (sem chave, sem PDF, indexando...), nada é gravado e o texto **volta ao campo**.
+- Campo: Enter envia, Shift+Enter quebra linha, cresce até 5 linhas. Seletores de provedor e modelo; **Nova** conversa e **Histórico** (reabre conversas antigas, que continuam salvas).
+- **Markdown seguro** (`chat/Markdown.tsx`): só elementos React, nunca HTML bruto; títulos, listas, citações, tabelas, blocos de código, negrito/itálico/código/links. Só `http(s)` abre fora do app; `javascript:`, `file:` etc. viram texto.
+- **Citações**: `[(arquivo.pdf, p. 12)](ref:A:12)` vira botão; clicar leva o PDF à página (e o campo de página acompanha). Chips "Referências" abaixo das mensagens fazem o mesmo. Se o documento foi **substituído/removido** desde a resposta, a interface avisa em vez de navegar.
+- Rodapé por resposta: provedor · modelo · custo (US$) · tokens; marcas "interrompida", "cortada pelo limite do modelo" e "N citação(ões) inexistente(s) removida(s)".
+- Material: bolhas de texto são **Solid** (opacas, fora do motor de vidro, por serem texto longo); o campo, os seletores e os botões são Film/Lens/Primary.
+- **Backend:** única mudança, `ESTUDOTRON_SECRET_STORE=memory` (cofre em memória, **só para testes**; o padrão continua sendo o Credential Manager). O autoteste a define sempre, para nunca tocar na sua chave real, e **recusa-se a rodar o fluxo de chave se já houver uma chave do Gemini**.
+- Autoteste: sobe o servidor Gemini **FALSO** do backend (`tests/fake_gemini.py`; o SDK oficial conversa com ele via `GOOGLE_GEMINI_BASE_URL`), sem custo e sem chave real.
+
 ## Comandos (PowerShell)
 
 ```powershell
@@ -66,7 +78,13 @@ Interface: motor de vidro inicia e desenha; navegar para Configurações lista 2
 
 **Leitor (PDFs reais gerados):** slot A com 24 páginas renderiza e é indexado; canvas com pixels de texto; camada de texto com o conteúdo da página; ajuste à largura (maior página 506 px em painel de 534 px); navegar para a página 12 e por ‹ › e rolagem; zoom manual desliga o ajuste e "Ajustar" volta ao mesmo valor (60% → 72% → 60%); slot B com PDF escaneado avisa "sem texto pesquisável" sem alterar A; substituir B zera página e zoom; os dois painéis ficam lado a lado com divisor; remover A mostra a área de soltar e o backend limpa o slot sem afetar B; sessão restaurada ao voltar para a tela; virtualização (no máximo 14 canvas ao mesmo tempo para 24 páginas) com o vidro mantendo ~16,7 ms/quadro durante a rolagem (cadência).
 
+**Chat (servidor Gemini falso):** Markdown com 11 propriedades de segurança/formatação; sem chave o erro aparece e o texto volta ao campo sem gravar nada; resposta chegando em 21 tamanhos distintos (streaming progressivo) e fechando completa; título, tabela e bloco de código renderizados; rodapé com provedor/modelo/custo (US$ 0,0003 · 410 em / 85 saída); clicar na citação leva o PDF da página 24 à 1 e os chips de referência também; **parar** mantém o parcial e a resposta continua ao trocar de tela; erro 429 vira mensagem clara e o chat segue utilizável; citação inventada (p. 999) é removida e a interface avisa; nova conversa mantém a antiga no histórico e reabre com citações; citação de documento substituído avisa em vez de navegar; o botão Chat oculta/mostra o painel e os PDFs reajustam (389 → 568 px); a chave falsa não aparece no DOM, em `/settings/ai` nem no histórico. Total no autoteste: 43 checks, 0 falhas.
+
 ## Limites conhecidos
+
+- **Nenhum provedor foi testado contra a API real nesta migração** (sem chaves): tudo do chat foi validado com o servidor Gemini FALSO, como já era no JavaFX. O primeiro teste real continua sendo "Configurações → colar a chave → Testar conexão". Não vi, por exemplo, como o modelo real cita páginas, o custo real mostrado nem o comportamento de `fallbacks`.
+- Só o Gemini falso foi exercitado de ponta a ponta (a Anthropic usa o mesmo backend, mas não rodei o `fake_anthropic` neste autoteste).
+- A virtualização de páginas libera por **distância em pixels**, não por contagem: com zoom pequeno (painel estreito) chegam a ~20 canvas de 24 páginas ao mesmo tempo, o que é pouco em memória por serem páginas pequenas; a memória real não foi medida.
 
 - **Não verificado automaticamente (exige mãos humanas):** o seletor nativo de arquivos, o **arrastar e soltar real** de um arquivo do Explorer (o autoteste usa o mesmo caminho de código `setPath`, mas não o evento de drop), o arrasto do divisor com o mouse, e os estados "arquivo ausente/alterado" na interface.
 - Não testei PDFs com 100+ páginas nem PDFs grandes/complexos (imagens JPX, formulários); o limite de memória real do visualizador não foi medido (só a contagem de canvas).

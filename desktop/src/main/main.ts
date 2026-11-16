@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { Backend, startBackend, TOKEN_HEADER } from './backend';
+import { spawn, type ChildProcess } from 'node:child_process';
+import net from 'node:net';
+import { Backend, freePort, resolveBackendDir, resolvePython, startBackend, TOKEN_HEADER } from './backend';
 import { HOST, installProtocol, registerScheme, SCHEME } from './protocol';
 
 const SELFTEST = process.argv.includes('--selftest');
@@ -90,10 +92,36 @@ async function shutdown(code?: number): Promise<void> {
   if (quitting) return;
   quitting = true;
   sseServer?.close();
+  fakeAi?.kill();
   await backend?.stop();
   backend = null;
   if (code !== undefined) app.exit(code);
   else app.quit();
+}
+
+/**
+ * Autoteste: sobe o servidor Gemini FALSO do backend (tests/fake_gemini.py) e aponta o backend para ele.
+ * O SDK oficial conversa de verdade com esse servidor, sem gastar créditos e sem chave real. O cofre de
+ * segredos vira "memory" para o teste NUNCA tocar no Credential Manager do usuário.
+ */
+let fakeAi: ChildProcess | null = null;
+async function startFakeAi(): Promise<void> {
+  const dir = resolveBackendDir();
+  const port = await freePort();
+  fakeAi = spawn(resolvePython(dir), ['-m', 'tests.fake_gemini', String(port)], { cwd: dir, stdio: 'ignore', windowsHide: true });
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const up = await new Promise<boolean>((res) => {
+      const s = net.connect(port, '127.0.0.1');
+      s.once('connect', () => { s.destroy(); res(true); });
+      s.once('error', () => res(false));
+    });
+    if (up) break;
+    if (Date.now() > deadline) throw new Error('servidor Gemini falso não subiu');
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  process.env.GOOGLE_GEMINI_BASE_URL = `http://127.0.0.1:${port}`;
+  process.env.ESTUDOTRON_SECRET_STORE = 'memory';
 }
 
 /** Autoteste: gera PDFs de teste com o PyMuPDF do backend (pasta temporária). */
@@ -116,6 +144,7 @@ ipcMain.handle('dialog:pickPdf', async () => {
 
 ipcMain.handle('app:info', () => ({
   testPdfs,
+  fakeAi: fakeAi !== null,
   selfTest: SELFTEST,
   backendReady: backend !== null,
   backendPid: backend?.pid ?? null, // não é segredo
@@ -153,6 +182,7 @@ app.whenReady().then(async () => {
     process.env.ESTUDOTRON_DATA_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'estudotron-selftest-'));
     await startSseServer();
     try { testPdfs = makeTestPdfs(); } catch (err) { console.error('Falha ao gerar PDFs de teste:', String(err)); }
+    try { await startFakeAi(); } catch (err) { console.error('Falha ao subir a IA falsa:', String(err)); }
   }
   try {
     backend = await startBackend();

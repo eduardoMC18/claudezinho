@@ -24,6 +24,7 @@ export const PdfView = forwardRef<PdfViewHandle, Props>(function PdfView({ url, 
   useEffect(() => {
     const c = new PdfController(scrollerRef.current!, hostRef.current!, (s) => cb.current(s));
     ctl.current = c;
+    (scrollerRef.current as unknown as { __pdf?: PdfController }).__pdf = c; // gancho de diagnóstico dos testes
     return () => { c.destroy(); ctl.current = null; };
   }, []);
 

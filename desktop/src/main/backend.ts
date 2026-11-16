@@ -34,7 +34,7 @@ export function freePort(): Promise<number> {
   });
 }
 
-function resolveBackendDir(): string {
+export function resolveBackendDir(): string {
   // dist/main/backend.js -> desktop/dist/main -> repositório
   const dir = process.env.ESTUDOTRON_BACKEND_DIR ?? path.resolve(__dirname, '..', '..', '..', 'backend');
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) {
@@ -43,7 +43,7 @@ function resolveBackendDir(): string {
   return dir;
 }
 
-function resolvePython(backendDir: string): string {
+export function resolvePython(backendDir: string): string {
   if (process.env.ESTUDOTRON_PYTHON) return process.env.ESTUDOTRON_PYTHON;
   const venv = path.join(backendDir, '.venv', 'Scripts', 'python.exe');
   return fs.existsSync(venv) ? venv : 'python';

@@ -12,9 +12,11 @@ import threading
 import uvicorn
 
 from app.infra.log_safety import install_redaction
+from app.infra.secrets import MemorySecretStore
 from app.main import create_app
 
 TOKEN_ENV = "ESTUDOTRON_TOKEN"
+SECRET_STORE_ENV = "ESTUDOTRON_SECRET_STORE"
 
 
 def _exit_when_stdin_closes() -> None:
@@ -42,7 +44,10 @@ def main() -> None:
     if args.exit_on_stdin_eof:
         _exit_when_stdin_closes()
 
-    app = create_app(token)
+    # ESTUDOTRON_SECRET_STORE=memory: cofre em memória, SOMENTE para testes automatizados (as chaves somem
+    # ao fechar e nada é gravado no Credential Manager). Sem a variável, o padrão é o cofre do sistema.
+    secrets = MemorySecretStore() if os.environ.get(SECRET_STORE_ENV) == "memory" else None
+    app = create_app(token, secrets=secrets)
     config = uvicorn.Config(app, host="127.0.0.1", port=args.port, log_level="info")
     server = uvicorn.Server(config)
     config.configure_logging()

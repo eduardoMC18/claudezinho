@@ -1,4 +1,7 @@
 /** Autoteste (--selftest): roda dentro da interface real e reporta ao processo principal. */
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Markdown } from './chat/Markdown';
 
 interface Check { name: string; ok: boolean; detail?: string }
 
@@ -27,6 +30,254 @@ const pageField = (s: 'A' | 'B') => pane(s).querySelector<HTMLInputElement>('.pa
 const click = (s: 'A' | 'B', sel: string) => pane(s).querySelector<HTMLElement>(sel)!.click();
 const reader = () => (window as unknown as { __reader: { setPath(s: string, p: string): Promise<void>; clear(s: string): Promise<void> } }).__reader;
 
+// ---------- Etapa 4: chat (contra o servidor Gemini FALSO) ----------
+
+const chatEl = () => document.querySelector<HTMLElement>('.chat');
+const ta = () => chatEl()!.querySelector<HTMLTextAreaElement>('textarea')!;
+const setTa = (v: string) => {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(ta(), v);
+  ta().dispatchEvent(new Event('input', { bubbles: true }));
+};
+const bubbles = () => [...chatEl()!.querySelectorAll<HTMLElement>('.bubble')];
+const lastAssistant = () => [...chatEl()!.querySelectorAll<HTMLElement>('.bubble.assistant')].pop();
+const act = (a: string) => chatEl()!.querySelector<HTMLElement>(`[data-action="${a}"]`)!;
+const selectValue = (sel: HTMLSelectElement, v: string) => {
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(sel, v);
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+};
+async function ask(text: string): Promise<void> {
+  setTa(text);
+  await waitFor(() => !act('send')?.hasAttribute('disabled'), 2000);
+  act('send').click();
+}
+const idle = () => !!chatEl()?.querySelector('[data-action="send"]') && !ta().disabled;
+
+async function chatScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  const KEY = 'TESTE-FAKE-CHAVE-123456';
+  await waitFor(() => pane('A').querySelector('[data-status="ready"]') && pane('B').querySelector('[data-status="ready"]'), 20000);
+
+  await check('IA falsa ativa e cofre em memória (nunca toca no Credential Manager)', async () => {
+    if (!info.fakeAi) throw new Error('servidor de IA falso não está ativo');
+    const s = (await (await fetch('/api/settings/ai')).json()) as { providers: Array<{ id: string; has_key: boolean }> };
+    const g = s.providers.find((p) => p.id === 'gemini');
+    if (!g) throw new Error('provedor gemini ausente');
+    if (g.has_key) throw new Error('já existe chave do gemini: abortando para não sobrescrever uma chave real');
+    return 'gemini sem chave; backend com ESTUDOTRON_SECRET_STORE=memory';
+  });
+
+  await check('Markdown seguro: sem HTML bruto, sem javascript:, citação vira botão', async () => {
+    const html = renderToStaticMarkup(createElement(Markdown, {
+      text: '<script>alert(1)</script> [x](javascript:alert(1)) **b** *i* `c` [(f.pdf, p. 3)](ref:A:3) [l](https://example.com)\n\n- um\n- dois\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = "<b>";\n```',
+    }));
+    const must: Array<[string, boolean]> = [
+      ['sem <script> literal', !html.includes('<script')],
+      ['texto escapado', html.includes('&lt;script&gt;')],
+      ['sem href javascript', !/href="javascript/i.test(html)],
+      ['negrito', html.includes('<strong>b</strong>')],
+      ['itálico', html.includes('<em>i</em>')],
+      ['código inline', html.includes('<code>c</code>')],
+      ['citação vira botão', html.includes('class="cite"') && html.includes('data-slot="A"') && html.includes('data-page="3"')],
+      ['link https seguro', html.includes('href="https://example.com"') && html.includes('rel="noreferrer noopener"')],
+      ['lista', html.includes('<ul><li>um</li><li>dois</li></ul>')],
+      ['tabela', html.includes('<table>') && html.includes('<th>a</th>') && html.includes('<td>2</td>')],
+      ['bloco de código escapado', html.includes('&lt;b&gt;') && !html.includes('<b>')],
+    ];
+    const bad = must.filter(([, ok]) => !ok).map(([n]) => n);
+    if (bad.length) throw new Error('falhou: ' + bad.join(', '));
+    return `${must.length} propriedades`;
+  });
+
+  await check('Sem chave: o erro aparece e o texto volta ao campo (nada é gravado)', async () => {
+    const before = bubbles().length;
+    await ask('ping sem chave');
+    const n = await waitFor(() => chatEl()!.querySelector('.chat-notice'), 8000);
+    if (!n) throw new Error('aviso não apareceu');
+    if (ta().value !== 'ping sem chave') throw new Error(`texto não voltou ao campo (“${ta().value}”)`);
+    if (bubbles().length !== before) throw new Error('uma mensagem foi gravada mesmo sem chave');
+    const t = n.textContent ?? '';
+    setTa('');
+    chatEl()!.querySelector<HTMLElement>('.chat-notice .link')?.click();
+    return t.replace(/\s+/g, ' ').slice(0, 90);
+  });
+
+  // salva uma chave FALSA no cofre em memória e escolhe o provedor Gemini
+  await check('Salvar chave falsa (memória) e selecionar o Gemini no seletor', async () => {
+    const r = await fetch('/api/settings/ai/providers/gemini/key', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ api_key: KEY }) });
+    if (r.status !== 204) throw new Error(`PUT chave: HTTP ${r.status}`);
+    const sel = chatEl()!.querySelector<HTMLSelectElement>('[data-sel="provider"]')!;
+    selectValue(sel, 'gemini');
+    await sleep(200);
+    if (sel.value !== 'gemini') throw new Error('seletor não mudou');
+    const m = chatEl()!.querySelector<HTMLSelectElement>('[data-sel="model"]')!;
+    return `provedor ${sel.value}, modelo ${m.value}`;
+  });
+
+  await check('Resposta em streaming: texto cresce aos poucos e termina completa', async () => {
+    const before = bubbles().length;
+    const sizes: number[] = [];
+    let obs: MutationObserver | null = null;
+    const started = new Promise<void>((res) => {
+      obs = new MutationObserver(() => {
+        const b = lastAssistant();
+        if (b && bubbles().length > before) { sizes.push(b.textContent?.length ?? 0); res(); }
+      });
+      obs.observe(chatEl()!, { childList: true, subtree: true, characterData: true });
+    });
+    await ask('O que é o mergesort? Compare os dois documentos');
+    await started;
+    const ok = await waitFor(() => lastAssistant()?.getAttribute('data-status') === 'complete', 30000);
+    obs!.disconnect();
+    if (!ok) throw new Error(`não completou (status ${lastAssistant()?.getAttribute('data-status')})`);
+    const distinct = new Set(sizes).size;
+    if (distinct < 3) throw new Error(`o texto não cresceu progressivamente (${distinct} tamanhos)`);
+    return `${distinct} tamanhos distintos durante a chegada; ${lastAssistant()!.textContent!.length} caracteres no fim`;
+  });
+  const first = lastAssistant()!;
+  await check('Markdown da resposta: título, tabela e código renderizados', async () => {
+    const h = first.querySelector('h3, h4, h5, h6')?.textContent; // "##" vira h4 dentro da bolha
+    if (h !== 'Resposta de teste') throw new Error(`título: ${h}`);
+    if (!first.querySelector('table th')) throw new Error('sem tabela');
+    if (!first.querySelector('pre code')?.textContent?.includes("print('olá')")) throw new Error('sem bloco de código');
+    return 'h3, table e pre/code';
+  });
+  await check('Rodapé mostra provedor/modelo e custo da resposta', async () => {
+    const t = first.querySelector('.bubble-foot')?.textContent ?? '';
+    if (!/Gemini/i.test(t) || !t.includes('US$')) throw new Error(`rodapé: “${t}”`);
+    return t;
+  });
+  await window.estudo.capture('6-chat-resposta');
+
+  await check('Citação clicável leva o PDF à página citada', async () => {
+    const cites = [...first.querySelectorAll<HTMLElement>('.cite')];
+    if (!cites.length) throw new Error('nenhuma citação na resposta');
+    const c = cites.find((x) => x.dataset.slot === 'A') ?? cites[0];
+    const slot = c.dataset.slot as 'A' | 'B', page = Number(c.dataset.page);
+    if (!/p\. \d+\)$/.test(c.textContent ?? '')) throw new Error(`rótulo inesperado: ${c.textContent}`);
+    // afasta o PDF da página citada antes de clicar
+    const away = page === 24 ? 1 : 24;
+    const f = pageField(slot);
+    setInput(f, String(away));
+    f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await waitFor(() => pageField(slot).value === String(away), 5000);
+    c.click();
+    const ok = await waitFor(() => pageField(slot).value === String(page), 6000);
+    if (!ok) {
+      const sc = pane(slot).querySelector<HTMLElement>('.pdf-scroller')!;
+      const st = (sc as unknown as { __pdf?: { state: unknown } }).__pdf?.state;
+      throw new Error(`PDF ficou na página ${pageField(slot).value}, esperava ${page}; scrollTop=${Math.round(sc.scrollTop)}; estado=${JSON.stringify(st)}; aviso="${chatEl()!.querySelector('.chat-notice')?.textContent ?? ''}"; doc=${pane(slot).querySelector('.name')?.textContent}`);
+    }
+    return `${c.textContent} → ${slot === 'A' ? 'PDF 1' : 'PDF 2'} na página ${page}`;
+  });
+  await check('Chips de referência abaixo das mensagens também navegam', async () => {
+    const chips = [...chatEl()!.querySelectorAll<HTMLElement>('.refs [data-ref]')];
+    if (!chips.length) throw new Error('sem chips de referência');
+    const chip = chips[chips.length - 1];
+    const [slot, page] = chip.dataset.ref!.split(':') as ['A' | 'B', string];
+    const away = page === '1' ? '2' : '1';
+    const f = pageField(slot);
+    setInput(f, away);
+    f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await waitFor(() => pageField(slot).value === away, 5000);
+    chip.click();
+    if (!(await waitFor(() => pageField(slot).value === page, 6000))) throw new Error('chip não navegou');
+    return `${chips.length} chip(s); ${chip.textContent}`;
+  });
+
+  await check('Parar: texto parcial é mantido e o chat volta a aceitar perguntas', async () => {
+    const before = bubbles().length;
+    await ask('LENTO explique o mergesort em detalhes');
+    // espera a bolha NOVA (a anterior também tem texto) começar a receber a resposta
+    const got = await waitFor(() => bubbles().length >= before + 2 && (lastAssistant()?.querySelector('.md')?.textContent?.length ?? 0) > 5, 15000);
+    if (!got) throw new Error('a resposta lenta não começou');
+    const len0 = lastAssistant()!.textContent!.length;
+    // a resposta continua em andamento ao trocar de tela
+    nav('settings');
+    await sleep(700);
+    nav('reader');
+    await waitFor(() => chatEl() && lastAssistant(), 5000);
+    const grew = await waitFor(() => lastAssistant()!.textContent!.length > len0, 4000);
+    if (!grew) throw new Error(`a resposta não continuou durante a troca de tela (len0=${len0}, agora=${lastAssistant()!.textContent!.length}, status=${lastAssistant()!.getAttribute('data-status')}, botão=${chatEl()!.querySelector('[data-action="stop"]') ? 'parar' : 'enviar'})`);
+    act('stop').click();
+    const cancelled = await waitFor(() => lastAssistant()?.getAttribute('data-status') === 'cancelled', 10000);
+    if (!cancelled) throw new Error(`status ${lastAssistant()?.getAttribute('data-status')}`);
+    if (!lastAssistant()!.textContent!.includes('interrompida')) throw new Error('sem a marca "interrompida"');
+    if (!(await waitFor(idle, 5000))) throw new Error('campo continua bloqueado');
+    return `parcial mantido (${lastAssistant()!.querySelector('.md')!.textContent!.length} caracteres), resposta seguiu durante a troca de tela`;
+  });
+
+  await check('Erro do provedor (429): mensagem clara na bolha e o chat segue utilizável', async () => {
+    await ask('ERRO429 teste de limite');
+    const ok = await waitFor(() => lastAssistant()?.getAttribute('data-status') === 'error', 20000);
+    if (!ok) throw new Error(`status ${lastAssistant()?.getAttribute('data-status')}`);
+    const m = lastAssistant()!.querySelector('.msg.error')?.textContent ?? '';
+    if (m.length < 10) throw new Error('sem mensagem de erro');
+    if (!(await waitFor(idle, 5000))) throw new Error('campo bloqueado após o erro');
+    return m.slice(0, 100);
+  });
+  await window.estudo.capture('7-chat-parar-e-erro');
+
+  await check('Citação inventada é removida e a interface avisa', async () => {
+    await ask('INVENTA mergesort');
+    const ok = await waitFor(() => lastAssistant()?.getAttribute('data-status') === 'complete', 30000);
+    if (!ok) throw new Error(`status ${lastAssistant()?.getAttribute('data-status')}`);
+    const b = lastAssistant()!;
+    if ([...b.querySelectorAll<HTMLElement>('.cite')].some((c) => c.dataset.page === '999')) throw new Error('a página 999 virou link');
+    if (!b.textContent!.includes('inexistente')) throw new Error('sem aviso de citação removida');
+    return 'página 999 removida; aviso exibido';
+  });
+
+  await check('Nova conversa mantém a antiga no histórico e permite reabri-la', async () => {
+    act('new-chat').click();
+    if (!(await waitFor(() => bubbles().length === 0, 5000))) throw new Error('a tela não limpou');
+    act('history').click();
+    const items = await waitFor(() => { const l = chatEl()!.querySelectorAll<HTMLElement>('[data-conv]'); return l.length >= 2 ? [...l] : null; }, 6000);
+    if (!items) throw new Error('histórico não mostra 2 conversas');
+    const old = items.find((i) => i.textContent!.includes('mergesort'));
+    if (!old) throw new Error('conversa antiga não listada');
+    old.click();
+    const back = await waitFor(() => bubbles().length >= 4 && chatEl()!.querySelector('.bubble.assistant .cite'), 6000);
+    if (!back) throw new Error(`conversa não reabriu (${bubbles().length} bolhas)`);
+    return `${items.length} conversas; reaberta com ${bubbles().length} mensagens e citações`;
+  });
+
+  await check('Documento substituído: clicar na citação antiga avisa em vez de navegar', async () => {
+    const cite = [...chatEl()!.querySelectorAll<HTMLElement>('.bubble.assistant .cite')].find((c) => c.dataset.slot === 'A');
+    if (!cite) throw new Error('sem citação do PDF 1 na conversa reaberta');
+    await reader().setPath('A', pdfs0().outro); // outro documento no slot A
+    await waitFor(() => pane('A').querySelector('.name')?.textContent === 'outro.pdf', 10000);
+    cite.click();
+    const w = await waitFor(() => chatEl()!.querySelector('.chat-notice'), 4000);
+    if (!w || !/substitu/i.test(w.textContent ?? '')) throw new Error('aviso de documento substituído não apareceu');
+    return w.textContent!.replace(/\s+/g, ' ').slice(0, 110);
+  });
+
+  await check('Botão "Chat" oculta e mostra o painel; os PDFs reajustam a largura', async () => {
+    const w0 = pane('B').getBoundingClientRect().width;
+    document.querySelector<HTMLElement>('[data-action="toggle-chat"]')!.click();
+    await sleep(500);
+    if (chatEl()) throw new Error('o painel não sumiu');
+    const w1 = pane('B').getBoundingClientRect().width;
+    if (w1 <= w0 + 50) throw new Error(`PDFs não ocuparam o espaço (${Math.round(w0)} → ${Math.round(w1)} px)`);
+    document.querySelector<HTMLElement>('[data-action="toggle-chat"]')!.click();
+    if (!(await waitFor(() => chatEl(), 3000))) throw new Error('o painel não voltou');
+    return `largura de um PDF: ${Math.round(w0)} → ${Math.round(w1)} px com o chat oculto`;
+  });
+
+  await check('A chave nunca aparece no DOM nem nas respostas da API', async () => {
+    if (document.documentElement.outerHTML.includes(KEY)) throw new Error('chave no DOM');
+    const t = await (await fetch('/api/settings/ai')).text();
+    if (t.includes(KEY)) throw new Error('GET /settings/ai devolveu a chave');
+    const conv = await (await fetch('/api/conversations/current')).text();
+    if (conv.includes(KEY)) throw new Error('a chave apareceu no histórico');
+    return 'ausente em DOM, /settings/ai e /conversations';
+  });
+  await sleep(300);
+  await window.estudo.capture('8-chat-historico');
+}
+
+let TEST_PDFS: Record<string, string> = {};
+const pdfs0 = () => TEST_PDFS;
+
 /** Cenário do Leitor com PDFs reais gerados pelo PyMuPDF (Etapa 3). */
 async function readerScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn, results: Check[]): Promise<void> {
   const pdfs = info.testPdfs;
@@ -53,8 +304,8 @@ async function readerScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, c
     const c = pane('A').querySelector<HTMLCanvasElement>('.pdf-page[data-page="1"] canvas')!;
     const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
     let dark = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i] < 100 && d[i + 3] > 0) dark++;
-    if (dark < 200) throw new Error(`só ${dark} pixels escuros`);
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 200 && d[i + 3] > 0) dark++; // não-branco (com zoom pequeno o texto vira cinza)
+    if (dark < 200) throw new Error(`só ${dark} pixels de texto`);
     return `${c.width}x${c.height}px, ${dark} pixels de texto`;
   });
   await check('Camada de texto selecionável com o conteúdo da página', async () => {
@@ -308,7 +559,9 @@ export async function runSelfTest(): Promise<void> {
   await sleep(500);
   nav('reader');
 
+  TEST_PDFS = info.testPdfs ?? {};
   await readerScenario(info, check, results);
+  await chatScenario(info, check);
 
   window.estudo.reportSelfTest({ ok: results.every((r) => r.ok), checks: results });
 }
