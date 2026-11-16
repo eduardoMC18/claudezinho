@@ -9,7 +9,11 @@ import net from 'node:net';
 import { Backend, freePort, resolveBackendDir, resolvePython, startBackend, TOKEN_HEADER } from './backend';
 import { HOST, installProtocol, registerScheme, SCHEME } from './protocol';
 
-const SELFTEST = process.argv.includes('--selftest');
+/** --smoke: verificação curta do app (inclusive EMPACOTADO): sem servidor de IA falso e sem Python do desenvolvedor. */
+const SMOKE = process.argv.includes('--smoke');
+const SELFTEST = process.argv.includes('--selftest') || SMOKE;
+const T0 = Date.now();
+let backendReadyMs: number | null = null;
 /** --shots=<pasta>: o autoteste salva capturas da janela (só em --selftest). */
 const SHOTS_DIR = SELFTEST ? process.argv.find((a) => a.startsWith('--shots='))?.slice('--shots='.length) : undefined;
 registerScheme(); // antes de ready
@@ -146,6 +150,8 @@ ipcMain.handle('app:info', () => ({
   testPdfs,
   fakeAi: fakeAi !== null,
   selfTest: SELFTEST,
+  smoke: SMOKE,
+  packaged: app.isPackaged,
   backendReady: backend !== null,
   backendPid: backend?.pid ?? null, // não é segredo
   windowVisible: mainWindow?.isVisible() ?? false,
@@ -165,7 +171,10 @@ ipcMain.handle('selftest:capture', async (_e, name: string) => {
 ipcMain.on('selftest:result', async (_e, rendererResult: { ok: boolean }) => {
   const mainSide = await mainSideChecks();
   const ok = rendererResult.ok && mainSide.backendWithoutTokenStatus === 401 && mainSide.backendWithTokenStatus === 200;
-  console.log('SELFTEST_RESULT ' + JSON.stringify({ ok, renderer: rendererResult, main: mainSide }));
+  console.log('SELFTEST_RESULT ' + JSON.stringify({
+    ok, renderer: rendererResult, main: mainSide,
+    run: { smoke: SMOKE, packaged: app.isPackaged, backendReadyMs, electron: process.versions.electron },
+  }));
   await shutdown(ok ? 0 : 1);
 });
 
@@ -181,11 +190,20 @@ app.whenReady().then(async () => {
   if (SELFTEST) {
     process.env.ESTUDOTRON_DATA_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'estudotron-selftest-'));
     await startSseServer();
-    try { testPdfs = makeTestPdfs(); } catch (err) { console.error('Falha ao gerar PDFs de teste:', String(err)); }
-    try { await startFakeAi(); } catch (err) { console.error('Falha ao subir a IA falsa:', String(err)); }
+    if (SMOKE) {
+      // PDFs gerados antes (tools/make_test_pdfs.py) e passados por --smoke-pdfs=<pasta>; nada de Python aqui
+      const dir = process.argv.find((a) => a.startsWith('--smoke-pdfs='))?.slice('--smoke-pdfs='.length);
+      if (dir && fs.existsSync(dir)) {
+        testPdfs = Object.fromEntries(fs.readdirSync(dir).filter((f) => f.endsWith('.pdf')).map((f) => [path.parse(f).name, path.join(dir, f)]));
+      }
+    } else {
+      try { testPdfs = makeTestPdfs(); } catch (err) { console.error('Falha ao gerar PDFs de teste:', String(err)); }
+      try { await startFakeAi(); } catch (err) { console.error('Falha ao subir a IA falsa:', String(err)); }
+    }
   }
   try {
     backend = await startBackend();
+    backendReadyMs = Date.now() - T0;
   } catch (err) {
     console.error(String(err));
     if (SELFTEST) { console.log('SELFTEST_RESULT ' + JSON.stringify({ ok: false, error: String(err) })); app.exit(1); return; }

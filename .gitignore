@@ -16,3 +16,7 @@ target/
 .env
 *.sqlite
 *.db
+
+# Empacotamento (PyInstaller)
+backend/dist-pkg/
+backend/build-pkg/

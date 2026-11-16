@@ -23,6 +23,8 @@ Frontend em **Electron + TypeScript** (React + Vite nas próximas etapas), com u
 
 - **Etapa 5** (Criar Exercícios): início, objetiva e subjetiva com correção estruturada (nota em anel), referências que abrem o Leitor na página, estados de erro. **Todas as telas do JavaFX têm equivalente funcional no Electron.** 55 checks no autoteste contra o Gemini FALSO, 0 falhas. Capturas `docs/screenshots/electron-etapa5-*.png`. Pendente para decidir a troca: teste manual (seletor, arrastar-e-soltar), chaves reais, empacotamento (electron-builder + PyInstaller, assinatura) e a medição de Tauri.
 
+- **Etapa 6** (Empacotamento): backend em PyInstaller (150 MB), app com electron-builder (NSIS, **197,6 MB**; 512 MB desempacotado), `scripts/package.ps1` de ponta a ponta em 63 s. Smoke test (`--smoke`) no app empacotado e no conteúdo extraído do instalador: 16 checks, 0 falhas, backend pronto em ~1,6–1,8 s, **sem o Python do desenvolvedor**. Instalador **não executado**, **sem assinatura**, antivírus não medido. Detalhes e números em `desktop/README.md`.
+
 ## Alternativas e por que ainda não decididas
 
 - **Tauri/WebView2:** mesmo motor Chromium no Windows, instalador menor, mas exige Rust e o WebView2 se atualiza sozinho (shader pode variar entre máquinas); em macOS cairia no WKWebView sem o efeito fiel. **Não foi medido**; deve ser comparado com o mesmo laboratório antes da decisão final.

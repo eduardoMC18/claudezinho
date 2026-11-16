@@ -7,6 +7,8 @@ interface EstudoBridge {
     windowVisible: boolean;
     testPdfs: Record<string, string> | null;
     fakeAi: boolean;
+    smoke: boolean;
+    packaged: boolean;
     electron: string;
     chromium: string;
   }>;

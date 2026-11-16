@@ -493,6 +493,48 @@ async function exercisesScenario(info: Awaited<ReturnType<EstudoBridge['info']>>
   });
 }
 
+/** --smoke (app empacotado): o essencial do Leitor com PDFs reais e os arquivos de dados do PDF.js. */
+async function smokeReader(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  const pdfs = info.testPdfs;
+  await check('Dados do PDF.js presentes no app (wasm, fontes padrão, CMaps)', async () => {
+    const need: Array<[string, string]> = [
+      ['/pdfjs/wasm/jbig2.wasm', 'application/wasm'],
+      ['/pdfjs/standard_fonts/FoxitFixed.pfb', ''],
+      ['/pdfjs/cmaps/78-H.bcmap', ''],
+    ];
+    const out: string[] = [];
+    for (const [url, type] of need) {
+      const r = await fetch(url);
+      if (r.status !== 200) throw new Error(`${url}: HTTP ${r.status}`);
+      if (type && !(r.headers.get('content-type') ?? '').startsWith(type)) throw new Error(`${url}: tipo ${r.headers.get('content-type')}`);
+      out.push(`${url.split('/').pop()} ${r.status}`);
+    }
+    return out.join(', ');
+  });
+  if (!pdfs?.texto || !pdfs.escaneado) {
+    await check('PDFs de teste informados (--smoke-pdfs)', async () => { throw new Error('use --smoke-pdfs=<pasta> com texto.pdf e escaneado.pdf'); });
+    return;
+  }
+  await waitFor(() => document.querySelector('[data-loaded="1"]'), 8000);
+  await check('Leitor: PDF de 24 páginas renderiza, é indexado e tem camada de texto', async () => {
+    await reader().setPath('A', pdfs.texto);
+    if (!(await waitFor(() => pane('A').querySelector('.pdf-page[data-rendered="1"]'), 25000))) throw new Error('nenhuma página renderizada');
+    if (!(await waitFor(() => pane('A').querySelector('[data-status="ready"]'), 25000))) throw new Error('não chegou a "pronto"');
+    const c = pane('A').querySelector<HTMLCanvasElement>('.pdf-page[data-page="1"] canvas')!;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    let ink = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 200 && d[i + 3] > 0) ink++;
+    if (ink < 200) throw new Error(`canvas quase em branco (${ink} pixels)`);
+    if (!(await waitFor(() => pane('A').querySelector('.textLayer')?.textContent?.includes('MARCADOR-PAGINA-A-1'), 8000))) throw new Error('sem camada de texto');
+    return `24 páginas, ${ink} pixels de texto, camada de texto ok`;
+  });
+  await check('Leitor: PDF escaneado avisa "sem texto pesquisável"', async () => {
+    await reader().setPath('B', pdfs.escaneado);
+    if (!(await waitFor(() => pane('B').querySelector('[data-status="no_text"]'), 25000))) throw new Error('estado no_text ausente');
+    return pane('B').querySelector('.status')!.textContent ?? '';
+  });
+}
+
 let TEST_PDFS: Record<string, string> = {};
 const pdfs0 = () => TEST_PDFS;
 
@@ -778,9 +820,13 @@ export async function runSelfTest(): Promise<void> {
   nav('reader');
 
   TEST_PDFS = info.testPdfs ?? {};
-  await readerScenario(info, check, results);
-  await chatScenario(info, check);
-  await exercisesScenario(info, check);
+  if (info.smoke) {
+    await smokeReader(info, check);
+  } else {
+    await readerScenario(info, check, results);
+    await chatScenario(info, check);
+    await exercisesScenario(info, check);
+  }
 
   window.estudo.reportSelfTest({ ok: results.every((r) => r.ok), checks: results });
 }

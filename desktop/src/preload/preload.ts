@@ -7,6 +7,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 contextBridge.exposeInMainWorld('estudo', {
   info: (): Promise<{
     selfTest: boolean;
+    smoke: boolean;
+    packaged: boolean;
     backendReady: boolean;
     backendPid: number | null;
     windowVisible: boolean;

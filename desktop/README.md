@@ -62,6 +62,42 @@ desktop/
 - Estados de erro com título por tipo (chave não configurada/recusada, limite, sobrecarga, sem conexão, resposta fora do formato, bloqueio...), "Tentar de novo" só quando faz sentido, atalhos para Configurações e Leitor. Respostas atrasadas de um fluxo abandonado são ignoradas.
 - Texto longo é **Solid** (cartões opacos); botões e alternativas são Film/Lens/Primary.
 
+## Etapa 6 — Empacotamento (Windows)
+
+```powershell
+cd desktop
+.\scripts\package.ps1              # backend (PyInstaller) + interface + electron-builder -> installer\estudoTron-3000-Setup-<versão>.exe
+.\scripts\package.ps1 -SkipBackend # reaproveita backend\dist-pkg
+.\scripts\package.ps1 -DirOnly     # só a pasta instalável (installer\win-unpacked), sem o instalador
+```
+
+- **Backend:** `backend/estudotron-backend.spec` (+ `run_backend.py`) gera `backend/dist-pkg/estudotron-backend/` (onedir, ~150 MB). Os dados (migrações SQL, `catalog.json`, `/viewer`) vão para os mesmos subdiretórios `app/...`, porque o código os acha por `Path(__file__)`. Hidden imports de uvicorn, `keyring.backends` (cofre do Windows), `google.genai` e `anthropic`. Sem UPX (aumenta falsos positivos de antivírus).
+- **App:** `electron-builder` (NSIS, por usuário, pasta de instalação escolhível). O backend vai em `resources/backend/`; o app empacotado inicia `estudotron-backend.exe` (`ESTUDOTRON_BACKEND_EXE` força outro caminho). A interface é servida por `fs` (não por `net.fetch(file://)`), então funciona dentro do `app.asar`. React/PDF.js ficam em `devDependencies`: já estão no bundle do Vite e não duplicam o pacote.
+- **Dados do usuário:** o mesmo banco do app JavaFX (`%APPDATA%\estudoTron3000\estudotron.db`) e as mesmas chaves no Credential Manager (serviço `estudoTron3000`).
+- **`--smoke`** (funciona no app empacotado): verificação curta sem Python do desenvolvedor: `estudoTron 3000.exe --smoke --smoke-pdfs=<pasta com texto.pdf e escaneado.pdf>` (gere os PDFs com `tools/make_test_pdfs.py`). Imprime `SELFTEST_RESULT {...}` e sai com 0/1.
+
+**Medido (este computador, Windows 11):**
+
+| Item | Valor |
+|---|---|
+| Backend empacotado | 150 MB (pasta); sobe a frio em ~1,6–1,9 s |
+| App desempacotado (`win-unpacked`) | 512 MB (Electron 45 ≈ 240 MB + backend 150 MB) |
+| Instalador NSIS | **197,6 MB** |
+| `app.asar` | 5,6 MB (222 arquivos, sem `node_modules`) |
+| Tempo do `package.ps1` completo | 63 s (com cache do electron-builder) |
+| Smoke no app desempacotado | 16 checks, 0 falhas; backend pronto em 1,6 s |
+| Smoke no conteúdo extraído do instalador | 16 checks, 0 falhas; backend pronto em 1,8 s |
+| Bateria completa de desenvolvimento (após as mudanças) | 55 checks, 0 falhas |
+
+**Não verificado / limites:**
+- **O instalador não foi executado** (instalar mexe em registro e atalhos). Provei o conteúdo extraindo-o com 7-Zip e rodando o smoke nele; o fluxo de instalação, atalhos, desinstalação e atualização **não foram testados**.
+- **Sem assinatura de código** (não há certificado): o SmartScreen e antivírus podem avisar; o risco de falso positivo do PyInstaller/Electron não assinados **não foi medido**.
+- O smoke empacotado usa o cofre real do Windows **só para leitura** (listar provedores); nada é gravado.
+- Ícone **provisório** (gerado por script), sem identidade visual definida.
+- Só x64 / Windows; sem atualização automática; sem teste em outra máquina (sem Python, sem Node).
+- Uma pasta `release/` antiga ficou bloqueada por um processo que não consegui identificar (por isso a saída ficou em `installer/`); ambas estão no `.gitignore`.
+- Tauri **não foi medido**; a escolha do Electron segue provisória.
+
 ## Comandos (PowerShell)
 
 ```powershell

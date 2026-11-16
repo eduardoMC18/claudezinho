@@ -1,7 +1,6 @@
 import { net, protocol } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { TOKEN_HEADER } from './backend';
 
 /**
@@ -54,13 +53,36 @@ async function forward(req: Request, target: string, token?: string): Promise<Re
   }
 }
 
-function serveStatic(rendererDir: string, pathname: string): Promise<Response> | Response {
+/** Tipos de conteúdo dos arquivos da interface. Scripts de módulo exigem JavaScript; wasm exige application/wasm. */
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
+  '.woff2': 'font/woff2',
+};
+
+/**
+ * Serve um arquivo da interface lendo-o com `fs` (funciona dentro do app.asar do app empacotado, ao contrário de
+ * `net.fetch(file://...)`, que não depende do asar patch do fs).
+ */
+async function serveStatic(rendererDir: string, pathname: string): Promise<Response> {
   const rel = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
   const file = path.resolve(rendererDir, '.' + rel);
   // impede sair da pasta da interface (../)
   if (file !== rendererDir && !file.startsWith(rendererDir + path.sep)) return new Response('Forbidden', { status: 403 });
   if (!fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return new Response('Not found', { status: 404 });
-  return net.fetch(pathToFileURL(file).toString(), { bypassCustomProtocolHandlers: true });
+  const body = await fs.promises.readFile(file);
+  return new Response(new Uint8Array(body), {
+    headers: { 'content-type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' },
+  });
 }
 
 export function installProtocol(t: ProxyTargets): void {

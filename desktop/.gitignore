@@ -2,3 +2,5 @@ node_modules/
 dist/
 # saida do build do Vite (src/renderer -> renderer); ancorado para nao ignorar src/renderer
 /renderer/
+/installer/
+/release/

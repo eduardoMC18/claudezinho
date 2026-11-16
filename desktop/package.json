@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "description": "Casca Electron do estudoTron 3000: backend Python, proxy com token e interface React com vidro WebGL2.",
+  "author": "estudoTron 3000",
   "main": "dist/main/main.js",
   "scripts": {
     "build:main": "tsc -p tsconfig.json",
@@ -10,12 +11,9 @@
     "typecheck:renderer": "tsc -p tsconfig.renderer.json",
     "build": "npm run build:main && npm run typecheck:renderer && npm run build:renderer",
     "start": "npm run build && electron .",
-    "selftest": "npm run build && electron . --selftest"
-  },
-  "dependencies": {
-    "pdfjs-dist": "^6.5.438",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "selftest": "npm run build && electron . --selftest",
+    "dist:dir": "npm run build && electron-builder --win --dir",
+    "dist": "npm run build && electron-builder --win"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -23,7 +21,38 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"
+  },
+  "build": {
+    "appId": "br.estudotron.app",
+    "productName": "estudoTron 3000",
+    "copyright": "estudoTron 3000",
+    "directories": { "output": "installer", "buildResources": "build" },
+    "files": [
+      "dist/**/*",
+      "renderer/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      { "from": "../backend/dist-pkg/estudotron-backend", "to": "backend" }
+    ],
+    "asar": true,
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "estudoTron 3000",
+      "artifactName": "estudoTron-3000-Setup-${version}.${ext}"
+    }
   }
 }

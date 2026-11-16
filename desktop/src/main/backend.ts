@@ -1,3 +1,4 @@
+import { app } from 'electron';
 import { spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
@@ -58,16 +59,34 @@ async function healthy(port: number, token: string): Promise<boolean> {
   }
 }
 
+/**
+ * Como iniciar o backend:
+ *  - app empacotado: resources/backend/estudotron-backend.exe (PyInstaller), sem Python no computador do usuário;
+ *  - ESTUDOTRON_BACKEND_EXE: força um executável (testes);
+ *  - desenvolvimento: `python -m app` com o .venv de backend/.
+ */
+function backendCommand(): { cmd: string; args: string[]; cwd: string } {
+  const forced = process.env.ESTUDOTRON_BACKEND_EXE;
+  const packaged = app.isPackaged ? path.join(process.resourcesPath, 'backend', 'estudotron-backend.exe') : null;
+  const exe = forced || packaged;
+  if (exe) {
+    if (!fs.existsSync(exe)) throw new Error(`Executável do backend não encontrado: ${exe}`);
+    return { cmd: exe, args: [], cwd: path.dirname(exe) };
+  }
+  const dir = resolveBackendDir();
+  return { cmd: resolvePython(dir), args: ['-m', 'app'], cwd: dir };
+}
+
 export async function startBackend(): Promise<Backend> {
-  const backendDir = resolveBackendDir();
+  const { cmd, args, cwd } = backendCommand();
   const port = await freePort();
   const token = randomBytes(32).toString('hex');
 
   const child: ChildProcess = spawn(
-    resolvePython(backendDir),
-    ['-m', 'app', '--port', String(port), '--exit-on-stdin-eof'],
+    cmd,
+    [...args, '--port', String(port), '--exit-on-stdin-eof'],
     {
-      cwd: backendDir,
+      cwd,
       env: { ...process.env, ESTUDOTRON_TOKEN: token },
       stdio: ['pipe', 'inherit', 'inherit'],
       windowsHide: true,
