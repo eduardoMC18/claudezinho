@@ -53,6 +53,15 @@ desktop/
 - **Backend:** única mudança, `ESTUDOTRON_SECRET_STORE=memory` (cofre em memória, **só para testes**; o padrão continua sendo o Credential Manager). O autoteste a define sempre, para nunca tocar na sua chave real, e **recusa-se a rodar o fluxo de chave se já houver uma chave do Gemini**.
 - Autoteste: sobe o servidor Gemini **FALSO** do backend (`tests/fake_gemini.py`; o SDK oficial conversa com ele via `GOOGLE_GEMINI_BASE_URL`), sem custo e sem chave real.
 
+## Etapa 5 — Criar Exercícios
+
+- Fluxo `screens/Exercises.tsx`: **início** (PDFs carregados como cartões, duas modalidades, aviso de envio ao Gemini, indexação/sem texto bloqueiam) → **gerando** → **questão** → **correção**. Só usa o Gemini (provedor fixo no backend). Sem PDFs, painel que leva ao Leitor.
+- **Objetiva** (`exercises/ObjectiveQuestion.tsx`): alternativas como botões (uma escolhida), o **gabarito só chega depois do envio** (alternativas embaralhadas no servidor). Correção: banner certo/errado, cada alternativa com a explicação, "Por que a alternativa X é a correta", referências, custo.
+- **Subjetiva** (`exercises/SubjectiveQuestion.tsx`): caixa de texto ampla (3–6000 caracteres, mesmos limites do backend), correção estruturada: **nota em anel (0–10)**, veredito, "O que você acertou", "O que faltou", "Conceitos para corrigir", "Como seria uma resposta mais completa", critérios e referências. Se a correção falha (ex.: 429), o texto digitado é mantido.
+- **Referências clicáveis:** abrem o **Leitor na página** citada (`pending` no `App` + `wantPage` no `PdfController`, que aplica o pedido quando o PDF termina de carregar, mesmo remontando o Leitor).
+- Estados de erro com título por tipo (chave não configurada/recusada, limite, sobrecarga, sem conexão, resposta fora do formato, bloqueio...), "Tentar de novo" só quando faz sentido, atalhos para Configurações e Leitor. Respostas atrasadas de um fluxo abandonado são ignoradas.
+- Texto longo é **Solid** (cartões opacos); botões e alternativas são Film/Lens/Primary.
+
 ## Comandos (PowerShell)
 
 ```powershell
@@ -80,7 +89,12 @@ Interface: motor de vidro inicia e desenha; navegar para Configurações lista 2
 
 **Chat (servidor Gemini falso):** Markdown com 11 propriedades de segurança/formatação; sem chave o erro aparece e o texto volta ao campo sem gravar nada; resposta chegando em 21 tamanhos distintos (streaming progressivo) e fechando completa; título, tabela e bloco de código renderizados; rodapé com provedor/modelo/custo (US$ 0,0003 · 410 em / 85 saída); clicar na citação leva o PDF da página 24 à 1 e os chips de referência também; **parar** mantém o parcial e a resposta continua ao trocar de tela; erro 429 vira mensagem clara e o chat segue utilizável; citação inventada (p. 999) é removida e a interface avisa; nova conversa mantém a antiga no histórico e reabre com citações; citação de documento substituído avisa em vez de navegar; o botão Chat oculta/mostra o painel e os PDFs reajustam (389 → 568 px); a chave falsa não aparece no DOM, em `/settings/ai` nem no histórico. Total no autoteste: 43 checks, 0 falhas.
 
+**Exercícios (Gemini falso):** sem PDFs o início explica e leva ao Leitor; com PDFs mostra 2 cartões e 2 modalidades habilitadas; a objetiva não traz o gabarito antes do envio e o botão só habilita com escolha; correção certa com 4 alternativas (1 correta com explicação), referências e custo; o backend recusa responder duas vezes (HTTP 409 `already_answered`); clicar na referência abre o Leitor no PDF 1 **na página 10**; "Nova questão" gera outra e a escolha errada mostra a correta; subjetiva com erro 429 mantém o texto e permite reenviar; correção com nota 8,5 (3 critérios, referências), 2,0 (conceitos a corrigir) e 5,0 (parcial); voltar durante a geração (atrasada por 1,5 s no teste) ignora a resposta; sem chave mostra "Chave do Gemini não configurada" com atalho para Configurações e, restaurada a chave, gera de novo. Total no autoteste: **55 checks, 0 falhas**.
+
 ## Limites conhecidos
+
+- **Exercícios só foram validados com o Gemini FALSO** (as questões e correções de teste são fixas); com o Gemini real falta ver a qualidade das questões, o tempo de geração e o formato real das respostas (`JSONRUIM`/respostas fora do JSON só foram testadas no pytest do backend).
+- Estados "arquivo ausente/alterado", seletor nativo de arquivos e arrastar-e-soltar real continuam sem teste humano.
 
 - **Nenhum provedor foi testado contra a API real nesta migração** (sem chaves): tudo do chat foi validado com o servidor Gemini FALSO, como já era no JavaFX. O primeiro teste real continua sendo "Configurações → colar a chave → Testar conexão". Não vi, por exemplo, como o modelo real cita páginas, o custo real mostrado nem o comportamento de `fallbacks`.
 - Só o Gemini falso foi exercitado de ponta a ponta (a Anthropic usa o mesmo backend, mas não rodei o `fake_anthropic` neste autoteste).

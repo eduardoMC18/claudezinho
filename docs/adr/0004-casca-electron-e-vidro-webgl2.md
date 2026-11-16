@@ -21,6 +21,8 @@ Frontend em **Electron + TypeScript** (React + Vite nas próximas etapas), com u
 
 - **Etapa 4** (Chat): SSE em streaming real contra o backend, Markdown seguro (sem HTML bruto), citações clicáveis que levam o PDF à página, parar, histórico, seletor de provedor/modelo, aviso de documento substituído. 43 checks no autoteste contra o servidor Gemini FALSO, 0 falhas. Achado real corrigido: o campo de página não ressincronizava quando se voltava à mesma página (`nav` no estado do visualizador). Única mudança no backend: `ESTUDOTRON_SECRET_STORE=memory` (só testes). **Nenhum provedor real foi testado.** Capturas `docs/screenshots/electron-etapa4-*.png`.
 
+- **Etapa 5** (Criar Exercícios): início, objetiva e subjetiva com correção estruturada (nota em anel), referências que abrem o Leitor na página, estados de erro. **Todas as telas do JavaFX têm equivalente funcional no Electron.** 55 checks no autoteste contra o Gemini FALSO, 0 falhas. Capturas `docs/screenshots/electron-etapa5-*.png`. Pendente para decidir a troca: teste manual (seletor, arrastar-e-soltar), chaves reais, empacotamento (electron-builder + PyInstaller, assinatura) e a medição de Tauri.
+
 ## Alternativas e por que ainda não decididas
 
 - **Tauri/WebView2:** mesmo motor Chromium no Windows, instalador menor, mas exige Rust e o WebView2 se atualiza sozinho (shader pode variar entre máquinas); em macOS cairia no WKWebView sem o efeito fiel. **Não foi medido**; deve ser comparado com o mesmo laboratório antes da decisão final.

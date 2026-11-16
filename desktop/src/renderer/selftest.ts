@@ -275,6 +275,224 @@ async function chatScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, che
   await window.estudo.capture('8-chat-historico');
 }
 
+// ---------- Etapa 5: exercícios (contra o servidor Gemini FALSO) ----------
+
+const exEl = () => document.querySelector<HTMLElement>('.exercises');
+const stage = () => exEl()?.getAttribute('data-stage');
+const exId = () => exEl()?.querySelector<HTMLElement>('[data-exercise-id]')?.dataset.exerciseId;
+const exAct = (a: string) => exEl()!.querySelector<HTMLElement>(`[data-action="${a}"]`)!;
+const setAnswer = (v: string) => {
+  const t = exEl()!.querySelector<HTMLTextAreaElement>('textarea[aria-label="Sua resposta"]')!;
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(t, v);
+  t.dispatchEvent(new Event('input', { bubbles: true }));
+};
+const exText = () => exEl()?.textContent ?? '';
+
+const backBtn = () => document.querySelector<HTMLElement>('[data-action="back"]'); // fica no cabeçalho, fora de .exercises
+
+async function startMode(k: 'objective' | 'subjective'): Promise<void> {
+  if (!(await waitFor(() => exEl(), 4000))) throw new Error('a tela de exercícios não montou');
+  if (stage() !== 'home') (backBtn() ?? exEl()!.querySelector<HTMLElement>('[data-action="home"]'))?.click();
+  await waitFor(() => stage() === 'home', 3000);
+  const b = await waitFor(() => { const e = exEl()?.querySelector<HTMLButtonElement>(`[data-mode="${k}"]`); return e && !e.disabled ? e : null; }, 8000);
+  if (!b) throw new Error(`modalidade ${k} indisponível`);
+  b.click();
+  if (!(await waitFor(() => exEl()?.querySelector(`[data-kind="${k}"]`), 20000))) throw new Error(`a questão ${k} não apareceu (estágio ${stage()}; ${exText().slice(0, 120)})`);
+}
+
+async function exercisesScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  const pdfs = info.testPdfs!;
+  const bothReady = () => pane('A').querySelector('[data-status="ready"]') && pane('B').querySelector('[data-status="ready"]');
+
+  await check('Sem PDFs: o início explica e leva ao Leitor de PDFs', async () => {
+    await reader().clear('A');
+    await reader().clear('B');
+    nav('exercises');
+    const p = await waitFor(() => exEl()?.querySelector('[data-status-panel="info"]'), 6000);
+    if (!p || !p.textContent!.includes('Carregue um PDF primeiro')) throw new Error('painel de PDF ausente não apareceu');
+    if (exEl()!.querySelector('[data-mode]')) throw new Error('as modalidades não deveriam aparecer sem PDFs');
+    exAct('to-reader').click();
+    if (!(await waitFor(() => document.querySelector('.reader'), 4000))) throw new Error('não foi para o Leitor');
+    return 'painel informativo + botão para o Leitor';
+  });
+
+  await reader().setPath('A', pdfs.texto);
+  await reader().setPath('B', pdfs.outro);
+  await waitFor(bothReady, 20000);
+
+  await check('Início: PDFs como cartões, duas modalidades e aviso de envio ao Gemini', async () => {
+    nav('exercises');
+    const cards = await waitFor(() => { const c = exEl()?.querySelectorAll('[data-source]'); return c && c.length === 2 ? c : null; }, 8000);
+    if (!cards) throw new Error('os dois PDFs não apareceram como cartões');
+    const modes = await waitFor(() => { const m = [...(exEl()?.querySelectorAll<HTMLButtonElement>('[data-mode]') ?? [])]; return m.length === 2 && m.every((b) => !b.disabled) ? m : null; }, 8000);
+    if (!modes) throw new Error('modalidades ausentes ou desabilitadas');
+    if (!/Gemini \(Google\)/.test(exText())) throw new Error('sem o aviso de envio ao Gemini');
+    return `${[...cards].map((c) => c.querySelector('b')!.textContent).join(' + ')}; modalidades habilitadas`;
+  });
+  await sleep(400);
+  await window.estudo.capture('9-exercicios-inicio');
+
+  let firstId = '';
+  await check('Objetiva: gabarito não vem antes do envio e o botão só habilita com escolha', async () => {
+    await startMode('objective');
+    firstId = exId()!;
+    const opts = [...exEl()!.querySelectorAll<HTMLElement>('[data-option]')];
+    if (opts.length !== 4) throw new Error(`${opts.length} alternativas`);
+    if (!exText().includes('mitocôndria')) throw new Error('enunciado ausente');
+    if (exEl()!.querySelector('.opt-result') || /Correta:|correta/.test(exText().replace(/Escolha uma alternativa/g, ''))) throw new Error('o gabarito apareceu antes do envio');
+    if (!exAct('submit').hasAttribute('disabled')) throw new Error('enviar deveria estar desabilitado sem escolha');
+    const right = opts.find((o) => o.textContent!.includes('Produzir ATP'))!;
+    right.click();
+    await sleep(150);
+    if (exAct('submit').hasAttribute('disabled')) throw new Error('enviar não habilitou após escolher');
+    return `4 alternativas; sem gabarito; escolhida ${right.dataset.option!.toUpperCase()}`;
+  });
+  await check('Objetiva certa: banner, explicação por alternativa, referências e custo', async () => {
+    exAct('submit').click();
+    if (!(await waitFor(() => exEl()?.querySelector('[data-verdict="correct"]'), 15000))) throw new Error(`sem veredito (${exText().slice(0, 150)})`);
+    const results = [...exEl()!.querySelectorAll<HTMLElement>('.opt-result')];
+    if (results.length !== 4) throw new Error(`${results.length} alternativas na correção`);
+    const correct = results.filter((r) => r.dataset.correct === '1');
+    if (correct.length !== 1 || !correct[0].textContent!.includes('Produzir ATP')) throw new Error('alternativa correta errada');
+    if (!correct[0].textContent!.includes('Correta: a mitocôndria produz ATP')) throw new Error('sem a explicação da alternativa');
+    if (!/Por que a alternativa [A-D] é a correta/.test(exText())) throw new Error('sem o cartão "Por que..."');
+    if (!exEl()!.querySelector('[data-ref]')) throw new Error('sem referências');
+    if (!/US\$/.test(exText())) throw new Error('sem custo');
+    return `1 correta de 4, explicações, ${exEl()!.querySelectorAll('[data-ref]').length} referência(s)`;
+  });
+  await window.estudo.capture('10-objetiva-correcao');
+  await check('Backend recusa responder duas vezes (already_answered)', async () => {
+    const r = await fetch(`/api/exercises/${firstId}/answer`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ option: 'a' }) });
+    const j = (await r.json()) as { detail?: { kind?: string } };
+    if (r.status !== 409 || j.detail?.kind !== 'already_answered') throw new Error(`HTTP ${r.status} ${JSON.stringify(j)}`);
+    return 'HTTP 409 already_answered';
+  });
+  await check('Referência clicada abre o Leitor de PDFs na página citada', async () => {
+    const chips = [...exEl()!.querySelectorAll<HTMLElement>('[data-ref]')];
+    const chip = chips[chips.length - 1];
+    const [slot, page] = chip.dataset.ref!.split(':') as ['A' | 'B', string];
+    chip.click();
+    if (!(await waitFor(() => document.querySelector('.reader'), 4000))) throw new Error('não trocou para o Leitor');
+    if (!(await waitFor(() => pane(slot)?.querySelector('.pdf-page') && pageField(slot).value === page, 10000))) throw new Error(`PDF na página ${pageField(slot)?.value}, esperava ${page}`);
+    return `${chip.textContent} → Leitor, PDF ${slot === 'A' ? '1' : '2'} na página ${page}`;
+  });
+  await check('"Nova questão" gera outra; a escolha errada mostra a correta', async () => {
+    nav('exercises');
+    await startMode('objective');
+    const id = exId();
+    const wrong = [...exEl()!.querySelectorAll<HTMLElement>('[data-option]')].find((o) => !o.textContent!.includes('Produzir ATP'))!;
+    wrong.click();
+    await sleep(150);
+    exAct('submit').click();
+    if (!(await waitFor(() => exEl()?.querySelector('[data-verdict="incorrect"]'), 15000))) throw new Error('sem veredito incorreto');
+    if (!/a correta é [A-D]/.test(exText())) throw new Error('não indicou a correta');
+    if (exEl()!.querySelectorAll('[data-picked="1"][data-correct="0"]').length !== 1) throw new Error('a escolha errada não foi marcada');
+    exAct('next').click();
+    const other = await waitFor(() => { const n = exId(); return n && n !== id ? n : null; }, 15000);
+    if (!other) throw new Error('"Nova questão" não trouxe outra');
+    return `escolha errada marcada; nova questão ${other.slice(0, 6)}… ≠ ${id!.slice(0, 6)}…`;
+  });
+
+  await check('Subjetiva: erro do provedor mantém o texto e permite reenviar', async () => {
+    await startMode('subjective');
+    if (!exAct('submit').hasAttribute('disabled')) throw new Error('enviar deveria estar desabilitado sem texto');
+    setAnswer('ERRO429 teste de limite');
+    await sleep(150);
+    exAct('submit').click();
+    const err = await waitFor(() => exEl()?.querySelector('.msg.error'), 12000);
+    if (!err) throw new Error('mensagem de erro não apareceu');
+    const t = exEl()!.querySelector<HTMLTextAreaElement>('textarea[aria-label="Sua resposta"]');
+    if (!t || t.value !== 'ERRO429 teste de limite') throw new Error('o texto digitado foi perdido');
+    return err.textContent!.slice(0, 90);
+  });
+  await check('Subjetiva correta: nota em anel, acertos, resposta ideal, critérios e referências', async () => {
+    setAnswer('A mitocôndria produz ATP pela respiração celular.');
+    await sleep(150);
+    exAct('submit').click();
+    if (!(await waitFor(() => exEl()?.querySelector('.grade[data-verdict="correct"]'), 15000))) throw new Error(`sem correção (${exText().slice(0, 140)})`);
+    const ring = exEl()!.querySelector('.score-ring')!.getAttribute('aria-label');
+    if (ring !== 'Nota 8,5 de 10') throw new Error(`anel: ${ring}`);
+    const t = exText();
+    for (const s of ['O que você acertou', 'Citou a produção de ATP', 'O que faltou', 'Como seria uma resposta mais completa', 'Critérios considerados']) if (!t.includes(s)) throw new Error(`faltou “${s}”`);
+    if (exEl()!.querySelectorAll('.criterion-chip').length !== 3) throw new Error('critérios != 3');
+    if (!exEl()!.querySelector('[data-ref]')) throw new Error('sem referências');
+    return `${ring}; 3 critérios; ${exEl()!.querySelectorAll('[data-ref]').length} referência(s)`;
+  });
+  await window.estudo.capture('11-subjetiva-correcao');
+  await check('Subjetiva errada: conceitos a corrigir; parcial: nota intermediária', async () => {
+    exAct('next').click();
+    if (!(await waitFor(() => exEl()?.querySelector('textarea[aria-label="Sua resposta"]'), 15000))) throw new Error('nova questão não apareceu');
+    setAnswer('resposta ERRADO');
+    await sleep(150);
+    exAct('submit').click();
+    if (!(await waitFor(() => exEl()?.querySelector('.grade[data-verdict="incorrect"]'), 15000))) throw new Error('sem veredito incorreto');
+    const r1 = exEl()!.querySelector('.score-ring')!.getAttribute('aria-label');
+    if (r1 !== 'Nota 2,0 de 10') throw new Error(`anel errado: ${r1}`);
+    if (!exText().includes('Conceitos para corrigir') || !exText().includes('Respiração celular')) throw new Error('sem conceitos a corrigir');
+    if (!exText().includes('Nenhum ponto da resposta se destacou desta vez.')) throw new Error('sem a mensagem de acertos vazios');
+    exAct('next').click();
+    await waitFor(() => exEl()?.querySelector('textarea[aria-label="Sua resposta"]'), 15000);
+    setAnswer('resposta PARCIAL');
+    await sleep(150);
+    exAct('submit').click();
+    if (!(await waitFor(() => exEl()?.querySelector('.grade[data-verdict="partial"]'), 15000))) throw new Error('sem veredito parcial');
+    const r2 = exEl()!.querySelector('.score-ring')!.getAttribute('aria-label');
+    if (r2 !== 'Nota 5,0 de 10') throw new Error(`anel parcial: ${r2}`);
+    return `${r1} (incorreta) e ${r2} (parcial)`;
+  });
+
+  /** Volta ao início (de qualquer estágio) e espera a lista de modalidades. */
+  const toHome = async () => {
+    if (stage() !== 'home') (backBtn() ?? exEl()!.querySelector<HTMLElement>('[data-action="home"]'))?.click();
+    if (!(await waitFor(() => stage() === 'home' && exEl()!.querySelector('[data-mode="objective"]'), 5000))) throw new Error(`não voltou ao início (estágio ${stage()})`);
+  };
+
+  await check('Gerando…: painel de carregamento; voltar antes de chegar ignora a resposta atrasada', async () => {
+    await toHome();
+    // atrasa a geração para a corrida ser determinística (o servidor falso responde quase na hora)
+    const realFetch = window.fetch;
+    window.fetch = async (input, init) => {
+      if (String(input).includes('/exercises/generate')) await sleep(1500);
+      return realFetch(input, init);
+    };
+    try {
+      exEl()!.querySelector<HTMLElement>('[data-mode="objective"]')!.click();
+      const loading = await waitFor(() => exEl()?.querySelector('[data-status-panel="loading"]'), 2000);
+      if (!loading || !loading.textContent!.includes('Gerando sua questão')) throw new Error('painel de carregamento ausente');
+      if (!loading.textContent!.includes('texto.pdf')) throw new Error('o carregamento não cita os PDFs lidos');
+      const back = await waitFor(() => backBtn(), 1000);
+      if (!back) throw new Error('botão Início ausente durante a geração');
+      back.click(); // volta ANTES de a questão chegar
+      await sleep(2800);
+      if (stage() !== 'home') throw new Error(`apareceu o estágio ${stage()} depois de voltar`);
+      return 'carregamento mostrado e resposta atrasada ignorada';
+    } finally {
+      window.fetch = realFetch;
+    }
+  });
+
+  await check('Sem chave: erro claro com atalho para Configurações; chave de volta funciona', async () => {
+    await toHome();
+    const del = await fetch('/api/settings/ai/providers/gemini/key', { method: 'DELETE' });
+    if (del.status !== 204) throw new Error(`DELETE chave: HTTP ${del.status}`);
+    const mode = await waitFor(() => exEl()?.querySelector<HTMLElement>('[data-mode="objective"]'), 4000);
+    if (!mode) throw new Error(`modalidade ausente (estágio ${stage()})`);
+    mode.click();
+    const p = await waitFor(() => exEl()?.querySelector('[data-status-panel="error"]'), 12000);
+    if (!p) throw new Error(`sem painel de erro (estágio ${stage()})`);
+    const title = p.querySelector('h2')!.textContent;
+    if (title !== 'Chave do Gemini não configurada') throw new Error(`título: ${title}`);
+    if (!exAct('to-settings') || !exAct('home')) throw new Error('faltam os botões');
+    exAct('to-settings').click();
+    if (!(await waitFor(() => document.querySelector('[data-provider]'), 5000))) throw new Error('não abriu Configurações');
+    const put = await fetch('/api/settings/ai/providers/gemini/key', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ api_key: 'TESTE-FAKE-CHAVE-123456' }) });
+    if (put.status !== 204) throw new Error(`PUT chave: HTTP ${put.status}`);
+    nav('exercises');
+    await startMode('objective');
+    return `“${title}” → Configurações → chave restaurada → questão gerada`;
+  });
+}
+
 let TEST_PDFS: Record<string, string> = {};
 const pdfs0 = () => TEST_PDFS;
 
@@ -562,6 +780,7 @@ export async function runSelfTest(): Promise<void> {
   TEST_PDFS = info.testPdfs ?? {};
   await readerScenario(info, check, results);
   await chatScenario(info, check);
+  await exercisesScenario(info, check);
 
   window.estudo.reportSelfTest({ ok: results.every((r) => r.ok), checks: results });
 }

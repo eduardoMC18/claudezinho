@@ -9,7 +9,7 @@ type Slots = Record<SlotId, DocumentInfo | null>;
 const EMPTY: Slots = { A: null, B: null };
 
 /** Leitor de PDFs: dois visualizadores independentes lado a lado, divisor ajustável, chat à direita. */
-export function Reader({ chat }: { chat: ChatApi }) {
+export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pending: CiteTarget | null; onPendingDone(): void }) {
   const [slots, setSlots] = useState<Slots>(EMPTY);
   const [errors, setErrors] = useState<Record<SlotId, string | null>>({ A: null, B: null });
   const [ratio, setRatio] = useState(0.5);
@@ -90,6 +90,13 @@ export function Reader({ chat }: { chat: ChatApi }) {
     setWarning(null);
     (t.slot === 'A' ? paneA : paneB).current?.goToPage(t.page);
   }, [slots]);
+
+  // referência clicada em outra tela (ex.: Exercícios): assim que a sessão carrega, leva o PDF à página
+  useEffect(() => {
+    if (!pending || !loaded) return;
+    onCite(pending);
+    onPendingDone();
+  }, [pending, loaded, onCite, onPendingDone]);
 
   // ---- divisor ----
   const dragFrom = (e: PointerEvent<HTMLDivElement>) => {

@@ -54,6 +54,72 @@ export const workspace = {
   fileUrl: (id: string) => `/api/documents/${encodeURIComponent(id)}/file`,
 };
 
+// ---- Exercícios ----
+
+export type ExerciseKind = 'objective' | 'subjective';
+
+export interface ExRef {
+  slot: SlotId;
+  page: number;
+  file_name: string;
+  document_id: string;
+}
+
+export interface ExUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number | null;
+}
+
+export interface ExOption {
+  id: string;
+  text: string;
+  /** só depois da correção */
+  explanation?: string;
+  is_correct?: boolean;
+}
+
+/** Questão gerada (sem gabarito). */
+export interface Exercise {
+  id: string;
+  kind: ExerciseKind;
+  statement: string;
+  difficulty: string;
+  options: ExOption[];
+  model: string;
+  usage: ExUsage | null;
+}
+
+/** Correção. Os campos de cada tipo ficam ausentes no outro. */
+export interface ExResult {
+  exercise_id: string;
+  kind: ExerciseKind;
+  difficulty?: string;
+  references: ExRef[];
+  usage?: ExUsage | null;
+  // objetiva
+  correct?: boolean;
+  selected?: string;
+  correct_option?: string;
+  explanation?: string;
+  options?: ExOption[];
+  // discursiva
+  verdict?: 'correct' | 'partial' | 'incorrect';
+  score?: number;
+  summary?: string;
+  strengths?: string[];
+  missing?: string[];
+  corrections?: Array<{ concept: string; explanation: string }>;
+  ideal_answer?: string;
+  criteria?: string[];
+}
+
+export const exercises = {
+  generate: (kind: ExerciseKind) => api<Exercise>('/exercises/generate', { method: 'POST', json: { kind } }),
+  answer: (id: string, body: { option?: string; text?: string }) =>
+    api<ExResult>(`/exercises/${encodeURIComponent(id)}/answer`, { method: 'POST', json: body }),
+};
+
 // ---- Configurações de IA (formato de GET /settings/ai) ----
 
 export interface ModelInfo {

@@ -51,6 +51,8 @@ export class PdfController {
   private tops: number[] = [];
   private maxW = 1;
   private loadId = 0;
+  /** Página pedida antes de o PDF terminar de carregar (ex.: clique numa referência de outra tela). */
+  private wantPage: number | null = null;
   private raf = 0;
   private resizeTimer = 0;
   private readonly ro: ResizeObserver;
@@ -76,7 +78,9 @@ export class PdfController {
 
   async load(url: string): Promise<void> {
     const id = ++this.loadId;
+    const keepWant = this.wantPage; // um pedido feito antes do load() começar sobrevive à limpeza
     this.clear();
+    this.wantPage = keepWant;
     this.set({ page: 1, total: 0, loading: true, error: null, fit: true });
     try {
       const task = getDocument({
@@ -98,6 +102,7 @@ export class PdfController {
       for (let i = 0; i < pdf.numPages; i++) this.slots.push(this.makeSlot(i, v.width, v.height));
       this.set({ total: pdf.numPages, loading: false });
       this.applyScale(this.fitScale());
+      if (this.wantPage !== null) { const p = this.wantPage; this.wantPage = null; this.goToPage(p); }
       void this.measureAll(id);
     } catch (e) {
       if (id !== this.loadId) return;
@@ -128,7 +133,7 @@ export class PdfController {
   // ---------- comandos ----------
 
   goToPage(n: number): void {
-    if (!this.slots.length) return;
+    if (!this.slots.length) { this.wantPage = n; return; } // o PDF ainda carrega: aplica assim que as páginas existirem
     const i = Math.min(Math.max(Math.round(n), 1), this.slots.length) - 1;
     this.scroller.scrollTop = this.tops[i] - 6;
     this.set({ nav: this.state.nav + 1 }); // reemite: o campo de página volta a mostrar a página real
