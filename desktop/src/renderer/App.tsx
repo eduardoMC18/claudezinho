@@ -1,0 +1,27 @@
+import { useEffect, useState } from 'react';
+import { GlassProvider } from './glass/GlassProvider';
+import { Placeholder } from './screens/Placeholder';
+import { Settings } from './screens/Settings';
+import { Sidebar, type ScreenId } from './ui/Sidebar';
+import { runSelfTest } from './selftest';
+
+export function App() {
+  const [screen, setScreen] = useState<ScreenId>('reader');
+
+  useEffect(() => {
+    void window.estudo.info().then((info) => { if (info.selfTest) void runSelfTest(); });
+  }, []);
+
+  return (
+    <GlassProvider>
+      <div className="app">
+        <Sidebar screen={screen} onSelect={setScreen} />
+        <div className="main">
+          {screen === 'reader' && <Placeholder title="Leitor de PDFs" what="Dois PDFs lado a lado com o chat da IA." />}
+          {screen === 'exercises' && <Placeholder title="Criar Exercícios" what="Questões objetivas e subjetivas geradas a partir dos PDFs." />}
+          {screen === 'settings' && <Settings />}
+        </div>
+      </div>
+    </GlassProvider>
+  );
+}

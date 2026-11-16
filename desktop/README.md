@@ -1,33 +1,62 @@
-# desktop — casca Electron (Etapa 1)
+# desktop — casca Electron + interface React (Etapas 1 e 2)
 
-Nova casca do estudoTron 3000 que **substituirá** o frontend JavaFX quando houver paridade funcional (ver `docs/adr/0004-casca-electron-e-vidro-webgl2.md`). O app JavaFX em `frontend/` continua intacto e é o que vale até lá.
+Nova casca do estudoTron 3000 que **substituirá** o frontend JavaFX quando houver paridade funcional (ver `docs/adr/0004-casca-electron-e-vidro-webgl2.md`). O app JavaFX em `frontend/` continua intacto e é o oficial até lá.
 
-## O que a Etapa 1 faz
+## Estrutura
 
-- Inicia o backend Python como processo filho (mesmo protocolo do `BackendManager.java`: porta livre, token por variável de ambiente, espera do `/health`, `--exit-on-stdin-eof`).
-- Esquema próprio `app://local/`: serve a interface (`renderer/`) e faz **proxy** de `app://local/api/*` para o backend, **injetando o token no processo principal**. A página nunca vê o token nem a porta.
-- Janela com `contextIsolation`, `sandbox`, sem `nodeIntegration`, CSP restrita, navegação limitada ao próprio esquema.
-- Página mínima de verificação (não é a interface final).
+```
+desktop/
+├── src/main/        processo principal (tsc → dist/): backend.ts (sobe o Python), protocol.ts (app://local + proxy com token), main.ts
+├── src/preload/     ponte mínima (sem token, sem porta, sem Node)
+├── src/renderer/    interface React + TypeScript (Vite → renderer/)
+│   ├── glass/       motor de vidro WebGL2: engine.ts, shaders.ts, spring.ts, GlassProvider, useGlass
+│   ├── ui/          primitivos: GlassPanel (Film/Lens), GlassButton (Lens/Primary/Film), Sidebar, ícones
+│   ├── screens/     Settings (API real de /settings/ai), Placeholder (telas ainda não migradas)
+│   ├── styles/      tokens.css (inclui o material de reserva) e app.css
+│   ├── api.ts       cliente do backend (tudo por /api/*)
+│   └── selftest.ts  autoteste que roda dentro da interface real
+└── renderer/        saída do build (não versionada)
+```
+
+## Etapa 1 — casca
+
+- Inicia o backend Python (mesmo protocolo do `BackendManager.java`: porta livre, token por variável de ambiente, `/health`, `--exit-on-stdin-eof`).
+- Esquema próprio `app://local/`: serve a interface e faz **proxy** de `app://local/api/*` para o backend **injetando o token no processo principal**; a página nunca vê token nem porta. Repasse em streaming (SSE).
+- Janela com `contextIsolation`, `sandbox`, sem `nodeIntegration`, CSP restrita, navegação só dentro do esquema.
+
+## Etapa 2 — sistema de design
+
+- **Motor de vidro WebGL2** (canvas atrás do DOM): três níveis de material. **Lens** (refração por bisel, dispersão cromática, especular que segue o cursor, mola ao pressionar), **Film** (blur por LOD, sem refração), **Solid** (DOM opaco, fora do motor). Uso: `<GlassPanel>` e `<GlassButton variant="lens|primary|film">`.
+- Regras embutidas: só o item ativo da barra e os controles são Lens; fundo animado só com a janela em foco e a 30 quadros/s em repouso; superfícies ordenadas por profundidade no DOM; limite de 40 superfícies.
+- **Material de reserva** (CSS opaco/blur) quando não há WebGL2, quando o contexto é perdido (e volta ao ser restaurado) e com `prefers-reduced-transparency` / `forced-colors`.
+- **Telas:** barra lateral, **Configurações** funcional (provedores, chave via Credential Manager, testar conexão, escolher modelo e provedor padrão), e placeholders honestos para Leitor de PDFs e Criar Exercícios (Etapa 3).
 
 ## Comandos (PowerShell)
 
 ```powershell
 cd desktop
-node node_modules\typescript\bin\tsc -p tsconfig.json     # compila src/ -> dist/
-node_modules\electron\dist\electron.exe .                  # abre a casca
-node_modules\electron\dist\electron.exe . --selftest       # autoteste (janela oculta, banco temporário)
+node node_modules\typescript\bin\tsc -p tsconfig.json            # processo principal -> dist/
+node node_modules\typescript\bin\tsc -p tsconfig.renderer.json   # checagem de tipos da interface
+node node_modules\vite\bin\vite.js build                         # interface -> renderer/
+node_modules\electron\dist\electron.exe .                        # abre o app
+node_modules\electron\dist\electron.exe . --selftest             # autoteste (janela oculta, banco temporário)
+node_modules\electron\dist\electron.exe . --selftest --show      # idem, com janela visível (inclui medição de quadros)
+node_modules\electron\dist\electron.exe . --selftest "--shots=C:\pasta"   # idem, salvando capturas
 ```
 
-Variáveis: `ESTUDOTRON_PYTHON` (padrão: `backend/.venv`), `ESTUDOTRON_BACKEND_DIR`, `ESTUDOTRON_DATA_DIR` (o autoteste usa uma pasta temporária; não toca no banco real).
+Variáveis: `ESTUDOTRON_PYTHON` (padrão: `backend/.venv`), `ESTUDOTRON_BACKEND_DIR`, `ESTUDOTRON_DATA_DIR` (o autoteste usa pasta temporária; **não toca no banco real nem no Credential Manager**).
 
-Observação do ambiente: nesta máquina o `node` não é encontrado pelos *shims* do `npm`/`npx` no Git Bash; use PowerShell ou chame `node ...` direto.
+Nesta máquina o `node` não é achado pelos atalhos do `npm`/`npx` no Git Bash; use PowerShell ou chame `node ...` direto (os scripts do `package.json` funcionam em terminais com `node` no PATH).
 
-## Autoteste (`--selftest`)
+## Autoteste
 
-Verifica: contexto isolado; ponte sem token/porta; `GET /api/health`; o proxy sobrescreve um token falso; `GET /api/workspace`; corpo JSON repassado; path traversal bloqueado; SSE repassado em streaming (5 eventos em ~600 ms, em 5 leituras, não em bloco); backend sem token responde 401 e escuta só em 127.0.0.1. Sai com código 0/1 e imprime `SELFTEST_RESULT {...}`.
+Casca: contexto isolado; ponte sem token/porta; proxy (`/api/health`, token falso sobrescrito, corpo JSON repassado); path traversal bloqueado; SSE em streaming (5 eventos em ~620 ms, em 5 leituras); backend sem token responde 401 e escuta só em 127.0.0.1.
+Interface: motor de vidro inicia e desenha; navegar para Configurações lista 2 provedores e 7 modelos da API real; nenhuma chave visível na tela; escolher outro modelo grava e a tela reflete; superfícies dentro do limite; medição de quadros (com `--show`/`--shots`).
 
-## Limites conhecidos desta etapa
+## Limites conhecidos
 
-- O SSE foi provado contra um servidor SSE local de teste (mesma rota de repasse), **não** contra o `/chat/stream` real (exigiria chave de IA no Credential Manager).
-- Não há empacotamento (electron-builder/PyInstaller) nem assinatura de código ainda.
-- Tauri/WebView2 não foi medido; a escolha do Electron é provisória (ver ADR).
+- O SSE foi provado contra um servidor SSE local de teste (mesma rota de repasse), não contra o `/chat/stream` real (exigiria chave de IA).
+- A medição de quadros é de **cadência** (média 16,67 ms, p95 16,8 ms, máx 16,9 ms com 15 superfícies, 300 quadros, RTX 3050, 1440×900, DPR 1), travada em 60 Hz; não é tempo de GPU. Não medi memória/CPU/GPU, nem GPU integrada.
+- "Salvar chave", "Remover chave" e "Testar conexão" não foram exercitados no autoteste (tocariam no Credential Manager e/ou na rede); os endpoints são os mesmos do JavaFX.
+- Telas Leitor de PDFs e Criar Exercícios ainda são placeholders. Sem empacotamento nem assinatura de código.
+- Tauri/WebView2 não foi medido; a escolha do Electron segue provisória.

@@ -9,8 +9,10 @@ contextBridge.exposeInMainWorld('estudo', {
     selfTest: boolean;
     backendReady: boolean;
     backendPid: number | null;
+    windowVisible: boolean;
     electron: string;
     chromium: string;
   }> => ipcRenderer.invoke('app:info'),
   reportSelfTest: (result: unknown): void => ipcRenderer.send('selftest:result', result),
+  capture: (name: string): Promise<string | null> => ipcRenderer.invoke('selftest:capture', name),
 });

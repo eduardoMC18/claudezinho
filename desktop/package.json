@@ -1,17 +1,28 @@
 {
   "name": "estudotron-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Casca Electron do estudoTron 3000 (Etapa 1): inicia o backend Python, protege o token e serve a interface.",
+  "description": "Casca Electron do estudoTron 3000: backend Python, proxy com token e interface React com vidro WebGL2.",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build:main": "tsc -p tsconfig.json",
+    "build:renderer": "vite build",
+    "typecheck:renderer": "tsc -p tsconfig.renderer.json",
+    "build": "npm run build:main && npm run typecheck:renderer && npm run build:renderer",
     "start": "npm run build && electron .",
     "selftest": "npm run build && electron . --selftest"
   },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.3.3",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
   }
 }

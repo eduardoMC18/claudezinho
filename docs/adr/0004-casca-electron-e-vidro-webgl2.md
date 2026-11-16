@@ -15,6 +15,8 @@ Frontend em **Electron + TypeScript** (React + Vite nas próximas etapas), com u
 - **Etapa 0** (`lab/glass-lab`): em Chromium com GPU real (RTX 3050), 60 quadros/s sem perdas com 16 superfícies; refração por pixel com dispersão e luz no cursor, impossível no JavaFX. Medida é cadência de quadros, não tempo de GPU; sem medição de memória, GPU ou CPU; sem teste em GPU integrada.
 - **Etapa 1** (`desktop/`): casca inicia o backend, proxy com token só no processo principal, SSE em streaming, `--selftest` passando (ver `desktop/README.md`).
 
+- **Etapa 2** (`desktop/src/renderer`): React + Vite + TS; motor de vidro como módulo (Lens/Film/Solid), barra lateral e tela de Configurações com a API real; fallback CSS. Autoteste no Electron real (GPU real, backend real): motor iniciou e desenhou, 2 provedores e 7 modelos listados, escolha de modelo gravada, 300 quadros com média 16,67 ms / p95 16,8 ms / máx 16,9 ms (15 superfícies, cadência travada em 60 Hz, não tempo de GPU). Capturas em `docs/screenshots/electron-etapa2-*.png`.
+
 ## Alternativas e por que ainda não decididas
 
 - **Tauri/WebView2:** mesmo motor Chromium no Windows, instalador menor, mas exige Rust e o WebView2 se atualiza sozinho (shader pode variar entre máquinas); em macOS cairia no WKWebView sem o efeito fiel. **Não foi medido**; deve ser comparado com o mesmo laboratório antes da decisão final.

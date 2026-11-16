@@ -7,6 +7,8 @@ import { Backend, startBackend, TOKEN_HEADER } from './backend';
 import { HOST, installProtocol, registerScheme, SCHEME } from './protocol';
 
 const SELFTEST = process.argv.includes('--selftest');
+/** --shots=<pasta>: o autoteste salva capturas da janela (só em --selftest). */
+const SHOTS_DIR = SELFTEST ? process.argv.find((a) => a.startsWith('--shots='))?.slice('--shots='.length) : undefined;
 registerScheme(); // antes de ready
 
 let backend: Backend | null = null;
@@ -57,7 +59,8 @@ function createWindow(): BrowserWindow {
     height: 900,
     minWidth: 1140,
     minHeight: 560,
-    show: !SELFTEST,
+    // janela oculta suspende o rAF: capturas e medição de quadros exigem janela visível (--shots ou --show)
+    show: !SELFTEST || !!SHOTS_DIR || process.argv.includes('--show'),
     backgroundColor: '#f4f4f6',
     title: 'estudoTron 3000',
     webPreferences: {
@@ -66,6 +69,7 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       nodeIntegration: false,
       webSecurity: true,
+      backgroundThrottling: !SELFTEST,
     },
   });
   // A interface só navega dentro do próprio esquema; links externos abrem no navegador do sistema.
@@ -76,7 +80,8 @@ function createWindow(): BrowserWindow {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  void win.loadURL(`${SCHEME}://${HOST}/index.html`);
+  // No autoteste a janela pode não ter foco: força o fundo animado para a medição de quadros.
+  void win.loadURL(`${SCHEME}://${HOST}/index.html${SELFTEST ? '?alwaysAnimate=1' : ''}`);
   return win;
 }
 
@@ -94,9 +99,19 @@ ipcMain.handle('app:info', () => ({
   selfTest: SELFTEST,
   backendReady: backend !== null,
   backendPid: backend?.pid ?? null, // não é segredo
+  windowVisible: mainWindow?.isVisible() ?? false,
   electron: process.versions.electron,
   chromium: process.versions.chrome,
 }));
+
+ipcMain.handle('selftest:capture', async (_e, name: string) => {
+  if (!SHOTS_DIR || !mainWindow) return null;
+  fs.mkdirSync(SHOTS_DIR, { recursive: true });
+  const file = path.join(SHOTS_DIR, `${String(name).replace(/[^\w-]/g, '_')}.png`);
+  const img = await mainWindow.webContents.capturePage();
+  fs.writeFileSync(file, img.toPNG());
+  return file;
+});
 
 ipcMain.on('selftest:result', async (_e, rendererResult: { ok: boolean }) => {
   const mainSide = await mainSideChecks();
