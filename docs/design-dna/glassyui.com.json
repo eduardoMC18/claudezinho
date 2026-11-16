@@ -1,0 +1,97 @@
+{
+  "source": "https://glassyui.com/",
+  "note": "Requested as glassui.dev (domain does not exist); user supplied glassyui.com.",
+  "tokens": {
+    "spacing": { "scale": [1, 2, 3, 4, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32], "base_unit": 2 },
+    "typography": {
+      "families": ["-apple-system", "ui-monospace"],
+      "scale": [
+        { "role": "h1", "size": "80px", "weight": "600", "lineHeight": "84px", "letterSpacing": "-1.2px" },
+        { "role": "h2", "size": "56px", "weight": "600", "lineHeight": "59.92px", "letterSpacing": "-0.28px" },
+        { "role": "h3", "size": "19px", "weight": "600", "lineHeight": "27.94px", "letterSpacing": "-0.38px" },
+        { "role": "body", "size": "21px", "weight": "400", "lineHeight": "29px", "maxWidth": "600px" },
+        { "role": "ui", "size": "12-14px", "weight": "400-600" }
+      ]
+    },
+    "colors": [
+      { "role": "page-background", "value": "#FAF9F7" },
+      { "role": "surface", "value": "#FFFFFF", "note": "72.9% da area" },
+      { "role": "glass-fill", "value": "rgba(255,255,255,0.86)" },
+      { "role": "control-track", "value": "rgba(118,118,128,0.2)" },
+      { "role": "text-primary", "value": "#222224" },
+      { "role": "text-secondary", "value": "#66666A" },
+      { "role": "accent", "value": "#0067D9", "note": "0.2% da area" },
+      { "role": "success", "value": "#14A874" },
+      { "role": "danger", "value": "#B02D14" }
+    ],
+    "radius": ["999px (77)", "9999px (58)", "28px (17)", "16px (16)", "18px (13)", "50% (11)", "22.5% (10)"],
+    "shadows": [
+      "0 0 0 1px rgba(0,0,0,0.1), 0 30px 80px -36px rgba(0,0,0,0.35)",
+      "0 2px 6px rgba(28,28,30,0.16), 0 1px 2px rgba(28,28,30,0.1), 0 0 0 0.5px rgba(28,28,30,0.05)",
+      "inset 0 0 0 0.5px rgba(255,255,255,0.7), 0 1px 3px rgba(0,0,0,0.15)",
+      "inset 0 1px 0 rgba(255,255,255,0.9)"
+    ],
+    "backdrop_filters": [
+      "blur(12px) saturate(1.6)",
+      "blur(12px) brightness(1.06) contrast(1.02) saturate(1.8)",
+      "blur(8px) brightness(1.06) contrast(1.02) saturate(1.8)",
+      "blur(2px) saturate(1.5) brightness(1.08)",
+      "url(#lg-lens-*): SVG feGaussianBlur(6) + feImage displacement map"
+    ],
+    "grid": { "columns": 3, "gutter": "20px", "template": "386.656px x3" },
+    "motion": {
+      "press": "scale 0.32s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "rise": "--lg-button-rise 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+      "color": "0.18s a 0.2s",
+      "reduced_motion": true,
+      "focus_visible": true
+    }
+  },
+  "taste": [
+    {
+      "name": "Refração de verdade só onde há forma; blur no resto",
+      "trigger": "When the designers faced a material that needs to bend the content behind it on every browser, while real refraction costs far more than a blur",
+      "decision": "Chose an SVG displacement-map lens on two hero surfaces and a WebGL2 canvas for the showcase, and plain blur(12px) saturate(1.6) on the other 13 surfaces, over refracting everything or blurring everything",
+      "reason": "Because the eye reads depth from a few edges that visibly bend the scene; the rest only needs to separate from the background",
+      "evidence": [
+        "13 nodes with blur(12px) saturate(1.6) versus 2 with url(#lg-lens-...)",
+        "caption: Android and the web blur what sits behind",
+        "caption: A WebGL2 canvas that refracts a backdrop image"
+      ]
+    },
+    {
+      "name": "Saturação e brilho levantados sob o vidro",
+      "trigger": "When the designers faced a pale surface that turns grey and dull once the backdrop is blurred",
+      "decision": "Chose to raise saturation (1.5 to 1.8), brightness (1.06 to 1.08) and contrast (1.02) in the backdrop filter over blur alone",
+      "reason": "Because blurring averages colours toward grey; boosting saturation restores the colour of the backdrop",
+      "evidence": [
+        "four backdrop-filter values with saturate(1.5...1.8)",
+        "background #FAF9F7 and surface #FFFFFF on 72.9% of the area",
+        "the only intense colour mass is the coral band behind the glass"
+      ]
+    },
+    {
+      "name": "Sombra longa com spread negativo e filete de 0,5 px",
+      "trigger": "When the designers faced panels that must float over a pale page without a heavy grey halo",
+      "decision": "Chose a 1px ring plus one long offset shadow with negative spread (0 30px 80px -36px at 35%) for panels, and 0.5px inner rim lights for controls, over a symmetric blurred shadow",
+      "reason": "Because a negative spread keeps the shadow under the panel instead of around it, which reads as distance and not as a grey glow",
+      "evidence": [
+        "18 nodes with 0 0 0 1px rgba(0,0,0,0.1), 0 30px 80px -36px rgba(0,0,0,0.35)",
+        "13 nodes with inset 0 0 0 0.5px rgba(255,255,255,0.7)",
+        "control shadows at 0.16, 0.1 and 0.05 alpha"
+      ]
+    },
+    {
+      "name": "Restraint: um azul só e mola só onde há toque",
+      "trigger": "When the designers faced a showcase of 38 glass components that could each carry a colour and a motion",
+      "decision": "Chose one accent blue (#0067D9) on 0.2% of the area and one spring curve for the pressed state over per-component colours and ambient animation",
+      "reason": "Because glass already carries the backdrop's colour, and motion that only answers a touch keeps the surface still when the user is not acting",
+      "evidence": [
+        "accent #0067D9 on 0.2% of the area",
+        "green #14A874 and red #B02D14 only in alerts",
+        "scale 0.32s overshoot curve only on buttons",
+        "prefers-reduced-motion present"
+      ]
+    }
+  ]
+}

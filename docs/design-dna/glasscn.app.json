@@ -1,0 +1,109 @@
+{
+  "source": "https://glasscn.app/showcase",
+  "tokens": {
+    "spacing": {
+      "scale": [2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 64, 112],
+      "base_unit": 4
+    },
+    "typography": {
+      "families": ["system-ui", "ui-rounded"],
+      "scale": [
+        { "role": "display-in-image", "size": "72px", "weight": "700", "family": "system-ui" },
+        { "role": "h1", "size": "48px", "weight": "700", "family": "ui-rounded", "letterSpacing": "-1.2px", "lineHeight": "48px" },
+        { "role": "section-title", "size": "28px", "weight": "600", "family": "system-ui" },
+        { "role": "h2", "size": "22px", "weight": "600", "family": "system-ui", "lineHeight": "28px" },
+        { "role": "h3", "size": "17px", "weight": "600", "family": "system-ui", "lineHeight": "22px" },
+        { "role": "body", "size": "16px", "weight": "400", "family": "system-ui", "lineHeight": "26px", "maxWidth": "672px" },
+        { "role": "control-label", "size": "14px", "weight": "600", "family": "system-ui" },
+        { "role": "caption", "size": "12px", "weight": "400", "family": "system-ui" }
+      ]
+    },
+    "colors": [
+      { "role": "page-background", "value": "#F4F4F8", "note": "lab(95.65 0.70 -2.54), neutro levemente azulado, 62.2% da area" },
+      { "role": "surface-solid", "value": "#FFFFFF", "note": "23% da area (barra de navegacao, controles)" },
+      { "role": "glass-fill-strong", "value": "rgba(255,255,255,0.74)", "note": "3.1% da area" },
+      { "role": "glass-fill", "value": "rgba(255,255,255,0.58)", "note": "2.9% da area" },
+      { "role": "glass-neutral-tint", "value": "rgba(111,112,116,0.12)", "note": "oklch(0.575 0.012) a 12%, 7.2% da area; 20% em estados de destaque" },
+      { "role": "text-primary", "value": "#000000" },
+      { "role": "text-secondary", "value": "#4B4B53", "note": "lab(37.29 0.81 -2.90), cinza tingido de azul" },
+      { "role": "accent", "value": "#0A5FD6", "note": "lab(45.35 7.9 -64.4), 0.3% da area: botao Get started e controles ligados" }
+    ],
+    "radius": ["9999px (cápsula, 51 nós)", "24px (palco de imagem e painel de ajustes)"],
+    "shadows": [
+      "0 10px 30px 0 rgba(0,0,0,0.12)  (camada unica, preto puro)",
+      "inset 0 1px 0 0 rgba(255,255,255,0.92)  (filete de luz no topo)",
+      "ring 0 0 0 1px rgba(0,0,0,0.072 a 0.2)  (aneis de controle)"
+    ],
+    "image_ratios": [
+      { "usage": "hero/palco Photos", "ratio": "1.50:1" },
+      { "usage": "palco retrato (coast.jpg)", "ratio": "0.67:1" },
+      { "usage": "palco Inspect (render)", "ratio": "~2.51:1" },
+      { "usage": "palco Separate (render)", "ratio": "~3.35:1" }
+    ],
+    "grid": { "max_width": "1152px", "columns": 2, "gutter": "24px", "template": "808px 272px" },
+    "motion": {
+      "color": "0.15s a 0.2s cubic-bezier(0.4, 0, 0.2, 1) (color, background-color, border-color)",
+      "shape": "scale 0.3s e height 0.2s com curva linear() de mola (20+ pontos)",
+      "reduced_motion": true,
+      "focus_visible": true
+    },
+    "material_controls": [
+      "Clarity (0% Clear a 100% Tinted, padrao 50%)",
+      "Reduce transparency",
+      "Reduce bright effects",
+      "Show control borders",
+      "Optical refraction (liga/desliga)",
+      "Edge displacement (14 px)",
+      "Regular / Clear"
+    ]
+  },
+  "taste": [
+    {
+      "name": "Imagem viva atrás do vidro, escurecida só sob o controle",
+      "trigger": "When the designers faced controls that must stay legible on top of a bright photo without turning the whole photo gray",
+      "decision": "Chose a full-colour photograph with a local dimming band only under each control over a uniform tint or a dark overlay on the whole stage",
+      "reason": "Because people read the glass as glass only when they can still recognise what sits behind it; a global tint makes the photo look like wallpaper and the control look like a sticker",
+      "evidence": [
+        "Photos stage 808x576px with 3 landscape photos (1.50:1 and 0.67:1)",
+        "page chrome is neutral #F4F4F8 on 62.2% of the area",
+        "Clarity slider runs Clear to Tinted at 50% default",
+        "page text: 'Only the bands under the controls are dimmed, so the image stays bright'"
+      ]
+    },
+    {
+      "name": "Refração e opacidade como parâmetros do usuário",
+      "trigger": "When the designers faced a material that looks right for one person and blinding or illegible for another",
+      "decision": "Chose to expose the material as settings (Clarity, Reduce transparency, Reduce bright effects, Show control borders, Optical refraction, Edge displacement 14px) over locking a single intensity as the brand look",
+      "reason": "Because transparency has a comfort limit that differs by eyes, screen and content, and a tool that cannot be dialled down gets switched off entirely",
+      "evidence": [
+        "6 settings across 2 panels in the 272px column with 24px radius",
+        "live values shown: 14 px, 50%",
+        "caption states the fallback: Chromium bends the backdrop at the edge, Safari and Firefox use the diffuse material"
+      ]
+    },
+    {
+      "name": "Cápsula única e luz no filete, sem relevo",
+      "trigger": "When the designers faced the temptation to make controls feel raised with layered shadows, gradients and coloured glows",
+      "decision": "Chose one single-layer shadow (0 10px 30px at 12% black) plus a 1px inner highlight (0 1px 0 white at 92%) and one pill radius over multi-layer elevation, tinted shadows or mixed corner radii",
+      "reason": "Because a raised, coloured button reads as an object on the page, while a thin rim of light on a transparent pill reads as the edge of a pane of glass",
+      "evidence": [
+        "51 nodes at 9999px radius, 17 at 3.36e7px, only 4 at 24px",
+        "shadows are pure black at 0.12, 0.2 and 0.072 alpha, not tinted",
+        "0 decorative gradients detected",
+        "accent #0A5FD6 on 0.3% of the area"
+      ]
+    },
+    {
+      "name": "Vidros que se fundem num só material",
+      "trigger": "When the designers faced several glass controls sitting next to each other",
+      "decision": "Chose a shared backdrop that merges nearby shapes into one contour over drawing every pill as an isolated sticker",
+      "reason": "Because glass is one continuous sheet in the physical world, and merging tells the eye that these controls belong to the same action group",
+      "evidence": [
+        "'Separate, then come together' stage ~804x240px with three circular controls and a Bring together button",
+        "page text: 'Labels stay sharp while a shared backdrop follows the merging shapes'",
+        "scale 0.3s and height 0.2s use a 20-point spring linear() curve",
+        "evidence is partly textual: the merge itself was not measured in the DOM"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,471 @@
+{
+  "url": "https://glasscn.app/showcase",
+  "title": "Liquid Glass showcase · glasscn",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "errors": [],
+  "colors": {
+    "pageBackground": "lab(95.6469 0.70259 -2.54252)",
+    "backgroundColors": [
+      {
+        "value": "lab(100 0 0)",
+        "count": 10,
+        "areaPct": 23
+      },
+      {
+        "value": "oklch(0.574998 0.0119847 none / 0.12)",
+        "count": 7,
+        "areaPct": 7.2
+      },
+      {
+        "value": "oklch(0.999998 0.0000253939 none / 0.1)",
+        "count": 6,
+        "areaPct": 0.8
+      },
+      {
+        "value": "oklch(0.574998 0.0119847 none / 0.2)",
+        "count": 6,
+        "areaPct": 0.5
+      },
+      {
+        "value": "lab(45.3543 7.91565 -64.3836)",
+        "count": 5,
+        "areaPct": 0.3
+      },
+      {
+        "value": "oklch(0.999998 0.0000253939 none / 0.58)",
+        "count": 2,
+        "areaPct": 2.9
+      },
+      {
+        "value": "lab(95.6469 0.70259 -2.54252)",
+        "count": 1,
+        "areaPct": 62.2
+      },
+      {
+        "value": "oklch(0.999998 0.0000253939 none / 0.74)",
+        "count": 1,
+        "areaPct": 3.1
+      }
+    ],
+    "textColors": [
+      {
+        "value": "lab(37.2892 0.812888 -2.89688)",
+        "count": 27
+      },
+      {
+        "value": "lab(0 0 0)",
+        "count": 26
+      },
+      {
+        "value": "oklab(0 0 0 / 0.7)",
+        "count": 6
+      },
+      {
+        "value": "lab(100 0 0)",
+        "count": 5
+      },
+      {
+        "value": "oklch(0.162897 0.0560953 256.196)",
+        "count": 2
+      }
+    ],
+    "accentCandidates": [
+      {
+        "value": "lab(37.2892 0.812888 -2.89688)",
+        "count": 18
+      },
+      {
+        "value": "lab(0 0 0)",
+        "count": 16
+      },
+      {
+        "value": "oklab(0 0 0 / 0.7)",
+        "count": 11
+      },
+      {
+        "value": "oklch(0.984998 0.000024917 none)",
+        "count": 5
+      },
+      {
+        "value": "oklch(0.574998 0.0119847 none / 0.12)",
+        "count": 4
+      },
+      {
+        "value": "lab(100 0 0)",
+        "count": 4
+      }
+    ]
+  },
+  "typography": {
+    "uniqueFamilies": [
+      {
+        "value": "system-ui",
+        "count": 253
+      },
+      {
+        "value": "ui-rounded",
+        "count": 1
+      }
+    ],
+    "headings": {
+      "h1": {
+        "size": "48px",
+        "weight": "700",
+        "lineHeight": "48px",
+        "letterSpacing": "-1.2px",
+        "family": "ui-rounded"
+      },
+      "h2": {
+        "size": "22px",
+        "weight": "600",
+        "lineHeight": "28.006px",
+        "letterSpacing": "normal",
+        "family": "system-ui"
+      },
+      "h3": {
+        "size": "17px",
+        "weight": "600",
+        "lineHeight": "21.998px",
+        "letterSpacing": "normal",
+        "family": "system-ui"
+      }
+    },
+    "body": {
+      "size": "16px",
+      "weight": "400",
+      "lineHeight": "26px",
+      "family": "system-ui",
+      "maxWidth": "672px"
+    },
+    "sizeDistribution": [
+      {
+        "value": "14px",
+        "count": 37
+      },
+      {
+        "value": "12px",
+        "count": 15
+      },
+      {
+        "value": "16px",
+        "count": 3
+      },
+      {
+        "value": "28px",
+        "count": 3
+      },
+      {
+        "value": "72px",
+        "count": 2
+      },
+      {
+        "value": "12.8px",
+        "count": 1
+      },
+      {
+        "value": "48px",
+        "count": 1
+      },
+      {
+        "value": "15px",
+        "count": 1
+      },
+      {
+        "value": "22px",
+        "count": 1
+      },
+      {
+        "value": "17px",
+        "count": 1
+      },
+      {
+        "value": "18px",
+        "count": 1
+      }
+    ],
+    "weightDistribution": [
+      {
+        "value": "400",
+        "count": 40
+      },
+      {
+        "value": "500",
+        "count": 12
+      },
+      {
+        "value": "600",
+        "count": 11
+      },
+      {
+        "value": "700",
+        "count": 3
+      }
+    ]
+  },
+  "effects": {
+    "radii": [
+      {
+        "value": "9999px",
+        "count": 51
+      },
+      {
+        "value": "3.35544e+07px",
+        "count": 17
+      },
+      {
+        "value": "24px",
+        "count": 4
+      },
+      {
+        "value": "9997px",
+        "count": 3
+      }
+    ],
+    "shadows": [
+      {
+        "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklch(0 0 none / 0.2) 0p",
+        "count": 8
+      },
+      {
+        "value": "oklch(0 0 none / 0.12) 0px 10px 30px 0px, oklch(0 0 256.196 / 0) 0px 0px 24px 0px inset",
+        "count": 7
+      },
+      {
+        "value": "oklch(0 0 none / 0.12) 0px 10px 30px 0px, oklch(0.999998 0.0000253939 none / 0.92) 0px 1px 0px 0px inset, oklch(0 0 256.196 / 0) 0px 0px 24px 0px inset",
+        "count": 1
+      },
+      {
+        "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklch(0.999998 0.0000253939 none / 0.92) 0px 1px 0px 0px inset, oklch(0 0 256.196 / 0) 0px 0px 24px 0px inset",
+        "count": 1
+      },
+      {
+        "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklch(0 0 none / 0.072) ",
+        "count": 1
+      },
+      {
+        "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklch(0 0 none / 0.12) 0",
+        "count": 1
+      }
+    ],
+    "transitions": [
+      "all",
+      "color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-",
+      "scale 0.3s linear(0 0%, 0.028 2.5%, 0.098 5%, 0.194 7.5%, 0.302 10%, 0.415 12.5%, 0.523 15%, 0.624 17.5%, 0.713 20%, 0.7",
+      "color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bez",
+      "height 0.2s linear(0 0%, 0.028 2.5%, 0.098 5%, 0.194 7.5%, 0.302 10%, 0.415 12.5%, 0.523 15%, 0.624 17.5%, 0.713 20%, 0.",
+      "color 0.2s cubic-bezier(0, 0, 0.2, 1), background-color 0.2s cubic-bezier(0, 0, 0.2, 1), border-color 0.2s cubic-bezier("
+    ]
+  },
+  "spacingDistribution": [
+    {
+      "value": "8px",
+      "count": 21
+    },
+    {
+      "value": "12px",
+      "count": 20
+    },
+    {
+      "value": "4px",
+      "count": 19
+    },
+    {
+      "value": "6px",
+      "count": 15
+    },
+    {
+      "value": "2px",
+      "count": 14
+    },
+    {
+      "value": "20px",
+      "count": 8
+    },
+    {
+      "value": "16px",
+      "count": 8
+    },
+    {
+      "value": "64px",
+      "count": 2
+    },
+    {
+      "value": "24px",
+      "count": 2
+    },
+    {
+      "value": "-1px",
+      "count": 2
+    },
+    {
+      "value": "28px",
+      "count": 2
+    },
+    {
+      "value": "48px",
+      "count": 2
+    },
+    {
+      "value": "40px",
+      "count": 1
+    },
+    {
+      "value": "32px",
+      "count": 1
+    },
+    {
+      "value": "112px",
+      "count": 1
+    }
+  ],
+  "buttons": [
+    {
+      "fontSize": "16px",
+      "fontWeight": "500",
+      "letterSpacing": "normal",
+      "textTransform": "none",
+      "borderRadius": "9999px",
+      "paddingTop": "0px",
+      "paddingLeft": "0px"
+    },
+    {
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "letterSpacing": "normal",
+      "textTransform": "none",
+      "borderRadius": "9999px",
+      "paddingTop": "0px",
+      "paddingLeft": "14px"
+    },
+    {
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "letterSpacing": "normal",
+      "textTransform": "none",
+      "borderRadius": "9999px",
+      "paddingTop": "0px",
+      "paddingLeft": "14px"
+    },
+    {
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "letterSpacing": "normal",
+      "textTransform": "none",
+      "borderRadius": "9999px",
+      "paddingTop": "2px",
+      "paddingLeft": "2px"
+    },
+    {
+      "fontSize": "14px",
+      "fontWeight": "600",
+      "letterSpacing": "normal",
+      "textTransform": "none",
+      "borderRadius": "9997px",
+      "paddingTop": "0px",
+      "paddingLeft": "12px"
+    }
+  ],
+  "layout": {
+    "bodyPadding": "0px",
+    "containerMaxWidth": "1152px",
+    "containerPadding": "40px 24px 64px",
+    "containerWidth": "1152px"
+  },
+  "cards": [],
+  "images": [
+    {
+      "src": "https://glasscn.app/showcase/alpine.jpg",
+      "naturalWidth": 1600,
+      "naturalHeight": 1067,
+      "ratio": "1.50:1",
+      "renderedWidth": "808px",
+      "role": "hero"
+    },
+    {
+      "src": "https://glasscn.app/showcase/alpine.jpg",
+      "naturalWidth": 1600,
+      "naturalHeight": 1067,
+      "ratio": "1.50:1",
+      "renderedWidth": "804px",
+      "role": "hero"
+    },
+    {
+      "src": "https://glasscn.app/showcase/coast.jpg",
+      "naturalWidth": 1200,
+      "naturalHeight": 1800,
+      "ratio": "0.67:1",
+      "renderedWidth": "804px",
+      "role": "hero"
+    }
+  ],
+  "spacingSamples": [
+    {
+      "tag": "section",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "20px"
+    },
+    {
+      "tag": "h1",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "h2",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "h3",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "p",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "nav",
+      "margin": "0px 0px 0px 16px",
+      "padding": "0px",
+      "gap": "4px"
+    },
+    {
+      "tag": "footer",
+      "margin": "96px 144px 0px",
+      "padding": "0px 24px 112px",
+      "gap": "12px"
+    }
+  ],
+  "sectionGaps": [
+    {
+      "between": "section[1]→section[2]",
+      "gap": 138
+    },
+    {
+      "between": "section[2]→section[3]",
+      "gap": 64
+    },
+    {
+      "between": "section[3]→section[4]",
+      "gap": 64
+    }
+  ],
+  "grid": {
+    "columns": 2,
+    "gap": "24px",
+    "template": "808px 272px",
+    "selector": "div.grid.items-start"
+  },
+  "gridCount": 4,
+  "focusVisible": true,
+  "reducedMotion": true
+}

@@ -1,0 +1,519 @@
+{
+  "url": "https://glassyui.com/",
+  "title": "Glassy UI — Glass components for React",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "errors": [],
+  "colors": {
+    "pageBackground": "rgb(250, 249, 247)",
+    "backgroundColors": [
+      {
+        "value": "rgb(255, 255, 255)",
+        "count": 46,
+        "areaPct": 72.9
+      },
+      {
+        "value": "rgb(0, 103, 217)",
+        "count": 13,
+        "areaPct": 0.2
+      },
+      {
+        "value": "rgba(255, 255, 255, 0.86)",
+        "count": 13,
+        "areaPct": 0.5
+      },
+      {
+        "value": "rgba(118, 118, 128, 0.2)",
+        "count": 12,
+        "areaPct": 0.4
+      },
+      {
+        "value": "rgba(0, 103, 217, 0.1)",
+        "count": 6,
+        "areaPct": 0.1
+      },
+      {
+        "value": "rgba(0, 0, 0, 0.08)",
+        "count": 4,
+        "areaPct": 0.1
+      },
+      {
+        "value": "rgba(224, 247, 238, 0.88)",
+        "count": 4,
+        "areaPct": 0.1
+      },
+      {
+        "value": "rgb(20, 168, 116)",
+        "count": 4,
+        "areaPct": 0
+      }
+    ],
+    "textColors": [
+      {
+        "value": "rgb(34, 34, 36)",
+        "count": 136
+      },
+      {
+        "value": "rgb(102, 102, 106)",
+        "count": 109
+      },
+      {
+        "value": "rgb(80, 80, 85)",
+        "count": 26
+      },
+      {
+        "value": "rgb(0, 94, 198)",
+        "count": 12
+      },
+      {
+        "value": "rgb(176, 45, 20)",
+        "count": 12
+      },
+      {
+        "value": "rgb(0, 84, 179)",
+        "count": 7
+      }
+    ],
+    "accentCandidates": [
+      {
+        "value": "rgb(102, 102, 106)",
+        "count": 56
+      },
+      {
+        "value": "rgb(34, 34, 36)",
+        "count": 53
+      },
+      {
+        "value": "rgb(80, 80, 85)",
+        "count": 11
+      },
+      {
+        "value": "rgb(0, 94, 198)",
+        "count": 6
+      },
+      {
+        "value": "rgb(255, 255, 255)",
+        "count": 4
+      },
+      {
+        "value": "rgba(118, 118, 128, 0.2)",
+        "count": 3
+      }
+    ]
+  },
+  "typography": {
+    "uniqueFamilies": [
+      {
+        "value": "-apple-system",
+        "count": 875
+      },
+      {
+        "value": "ui-monospace",
+        "count": 24
+      }
+    ],
+    "headings": {
+      "h1": {
+        "size": "80px",
+        "weight": "600",
+        "lineHeight": "84px",
+        "letterSpacing": "-1.2px",
+        "family": "-apple-system"
+      },
+      "h2": {
+        "size": "56px",
+        "weight": "600",
+        "lineHeight": "59.92px",
+        "letterSpacing": "-0.28px",
+        "family": "-apple-system"
+      },
+      "h3": {
+        "size": "19px",
+        "weight": "600",
+        "lineHeight": "27.9412px",
+        "letterSpacing": "-0.38px",
+        "family": "-apple-system"
+      },
+      "h4": {
+        "size": "19px",
+        "weight": "600",
+        "lineHeight": "27.9412px",
+        "letterSpacing": "-0.38px",
+        "family": "-apple-system"
+      }
+    },
+    "body": {
+      "size": "21px",
+      "weight": "400",
+      "lineHeight": "29.001px",
+      "family": "-apple-system",
+      "maxWidth": "600px"
+    },
+    "sizeDistribution": [
+      {
+        "value": "12px",
+        "count": 71
+      },
+      {
+        "value": "14px",
+        "count": 63
+      },
+      {
+        "value": "13px",
+        "count": 48
+      },
+      {
+        "value": "19px",
+        "count": 29
+      },
+      {
+        "value": "17px",
+        "count": 28
+      },
+      {
+        "value": "15px",
+        "count": 24
+      },
+      {
+        "value": "11px",
+        "count": 16
+      },
+      {
+        "value": "21px",
+        "count": 12
+      },
+      {
+        "value": "56px",
+        "count": 9
+      },
+      {
+        "value": "28px",
+        "count": 5
+      },
+      {
+        "value": "80px",
+        "count": 3
+      },
+      {
+        "value": "22px",
+        "count": 3
+      }
+    ],
+    "weightDistribution": [
+      {
+        "value": "400",
+        "count": 146
+      },
+      {
+        "value": "600",
+        "count": 138
+      },
+      {
+        "value": "500",
+        "count": 33
+      },
+      {
+        "value": "800",
+        "count": 2
+      },
+      {
+        "value": "700",
+        "count": 1
+      }
+    ]
+  },
+  "effects": {
+    "radii": [
+      {
+        "value": "999px",
+        "count": 77
+      },
+      {
+        "value": "9999px",
+        "count": 58
+      },
+      {
+        "value": "28px",
+        "count": 17
+      },
+      {
+        "value": "16px",
+        "count": 16
+      },
+      {
+        "value": "18px",
+        "count": 13
+      },
+      {
+        "value": "50%",
+        "count": 11
+      },
+      {
+        "value": "22.5%",
+        "count": 10
+      },
+      {
+        "value": "30px",
+        "count": 5
+      }
+    ],
+    "shadows": [
+      {
+        "value": "rgba(0, 0, 0, 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0.35) 0px 30px 80px -36px",
+        "count": 18
+      },
+      {
+        "value": "rgba(28, 28, 30, 0.16) 0px 2px 6px 0px, rgba(28, 28, 30, 0.1) 0px 1px 2px 0px, rgba(28, 28, 30, 0.05) 0px 0px 0px 0.5px",
+        "count": 14
+      },
+      {
+        "value": "rgba(255, 255, 255, 0.7) 0px 0px 0px 0.5px inset, rgba(0, 0, 0, 0.15) 0px 1px 3px 0px",
+        "count": 13
+      },
+      {
+        "value": "rgba(0, 0, 0, 0.1) 0px 1px 2px 0px inset",
+        "count": 5
+      },
+      {
+        "value": "rgba(255, 255, 255, 0.9) 0px 1px 0px 0px inset, rgba(20, 168, 116, 0.4) 0px 0px 0px 0.5px inset",
+        "count": 4
+      },
+      {
+        "value": "rgba(0, 0, 0, 0.08) 0px -1px 0px 0px inset, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.3) 0px 6px 14px -8px",
+        "count": 4
+      }
+    ],
+    "backdropFilters": [
+      {
+        "value": "blur(12px) saturate(1.6)",
+        "count": 13
+      },
+      {
+        "value": "blur(12px) brightness(1.06) contrast(1.02) saturate(1.8)",
+        "count": 4
+      },
+      {
+        "value": "blur(8px) brightness(1.06) contrast(1.02) saturate(1.8)",
+        "count": 3
+      },
+      {
+        "value": "blur(2px) saturate(1.5) brightness(1.08)",
+        "count": 2
+      },
+      {
+        "value": "url(\"#lg-lens-_R_330olttb_\") grayscale(1) contrast(0.5) brightness(0.35) sepia(1) hue-rotate(172deg) saturate(6) brightness(1.4)",
+        "count": 1
+      },
+      {
+        "value": "url(\"#lg-lens-_R_530olttb_\")",
+        "count": 1
+      }
+    ],
+    "transitions": [
+      "all",
+      "none",
+      "color 0.2s, background-color 0.2s",
+      "background-color 0.18s, color 0.18s, scale 0.32s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "--lg-button-rise 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+      "background-color 0.2s"
+    ]
+  },
+  "spacingDistribution": [
+    {
+      "value": "2px",
+      "count": 131
+    },
+    {
+      "value": "8px",
+      "count": 38
+    },
+    {
+      "value": "4px",
+      "count": 35
+    },
+    {
+      "value": "6px",
+      "count": 34
+    },
+    {
+      "value": "12px",
+      "count": 26
+    },
+    {
+      "value": "28px",
+      "count": 25
+    },
+    {
+      "value": "16px",
+      "count": 23
+    },
+    {
+      "value": "10px",
+      "count": 19
+    },
+    {
+      "value": "14px",
+      "count": 18
+    },
+    {
+      "value": "20px",
+      "count": 18
+    },
+    {
+      "value": "24px",
+      "count": 17
+    },
+    {
+      "value": "32px",
+      "count": 16
+    },
+    {
+      "value": "7px",
+      "count": 15
+    },
+    {
+      "value": "3px",
+      "count": 13
+    },
+    {
+      "value": "1px",
+      "count": 10
+    }
+  ],
+  "buttons": [
+    {
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "borderRadius": "999px",
+      "paddingTop": "0px",
+      "paddingLeft": "11px",
+      "background": "rgba(0, 0, 0, 0.05)",
+      "boxShadow": "rgba(0, 0, 0, 0.1) 0px 0px 0px 1px inset",
+      "backdrop": "none"
+    },
+    {
+      "fontSize": "12.8px",
+      "fontWeight": "500",
+      "borderRadius": "999px",
+      "paddingTop": "0px",
+      "paddingLeft": "0px",
+      "background": "rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "backdrop": "none"
+    },
+    {
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "borderRadius": "7px",
+      "paddingTop": "0px",
+      "paddingLeft": "9px",
+      "background": "rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "backdrop": "none"
+    },
+    {
+      "fontSize": "13px",
+      "fontWeight": "500",
+      "borderRadius": "7px",
+      "paddingTop": "0px",
+      "paddingLeft": "9px",
+      "background": "rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "backdrop": "none"
+    },
+    {
+      "fontSize": "13px",
+      "fontWeight": "400",
+      "borderRadius": "9999px",
+      "paddingTop": "0px",
+      "paddingLeft": "2px",
+      "background": "rgb(0, 103, 217)",
+      "boxShadow": "rgba(0, 0, 0, 0.1) 0px 1px 2px 0px inset",
+      "backdrop": "none"
+    },
+    {
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "borderRadius": "9999px",
+      "paddingTop": "7px",
+      "paddingLeft": "14px",
+      "background": "rgba(0, 0, 0, 0)",
+      "boxShadow": "none",
+      "backdrop": "none"
+    }
+  ],
+  "layout": {
+    "containerMaxWidth": "none",
+    "containerPadding": "0px",
+    "containerWidth": "1430px"
+  },
+  "cards": [],
+  "spacingSamples": [
+    {
+      "tag": "section",
+      "margin": "0px",
+      "padding": "108px 24px 45px",
+      "gap": "normal"
+    },
+    {
+      "tag": "h1",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "h2",
+      "margin": "0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "p",
+      "margin": "24px 391px 0px",
+      "padding": "0px",
+      "gap": "normal"
+    },
+    {
+      "tag": "button",
+      "margin": "0px 4px 0px 8px",
+      "padding": "0px 6px 0px 11px",
+      "gap": "8px"
+    },
+    {
+      "tag": "nav",
+      "margin": "0px 83.9062px",
+      "padding": "0px",
+      "gap": "2px"
+    },
+    {
+      "tag": "footer",
+      "margin": "160px 0px 0px",
+      "padding": "32px 24px 40px",
+      "gap": "normal"
+    }
+  ],
+  "sectionGaps": [
+    {
+      "between": "4→5",
+      "gap": 160
+    }
+  ],
+  "grid": {
+    "columns": 3,
+    "gap": "20px",
+    "template": "386.656px 386.672px 386.656px",
+    "selector": "div.component-grid"
+  },
+  "gridCount": 12,
+  "focusVisible": true,
+  "reducedMotion": true,
+  "svgFilters": [
+    "<filter id=\"lg-lens-_R_330olttb_\" x=\"-20\" y=\"-20\" width=\"238\" height=\"89\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"6\" result=\"frost\"></feGaussianBlur><feImage href=\"data:image/png;base64,iVBORw0KG",
+    "<filter id=\"lg-lens-_R_530olttb_\" x=\"-20\" y=\"-20\" width=\"220\" height=\"89\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"6\" result=\"frost\"></feGaussianBlur><feImage href=\"data:image/png;base64,iVBORw0KG",
+    "<filter id=\"lg-lens-_R_qdd0olttbH1_\" x=\"-20\" y=\"-20\" width=\"360\" height=\"226\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"6\" result=\"frost\"></feGaussianBlur><feImage href=\"data:image/png;base64,iVBOR",
+    "<filter id=\"lg-lens-_R_3add0olttbH1_\" x=\"-20\" y=\"-20\" width=\"370\" height=\"391\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"6\" result=\"frost\"></feGaussianBlur><feImage href=\"data:image/png;base64,iVBO",
+    "<filter id=\"lg-capsule-_R_ejfadd0olttb_\" x=\"-18\" y=\"-18\" width=\"156\" height=\"132\" filterUnits=\"userSpaceOnUse\" primitiveUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"1.0499999999999998\" result=\"blurred\"></feGaussianBlur><feImage href=\"data"
+  ]
+}

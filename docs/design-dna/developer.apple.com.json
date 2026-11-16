@@ -1,0 +1,94 @@
+{
+  "source": "https://developer.apple.com/documentation/TechnologyOverviews/liquid-glass",
+  "caveat": "CSS measured describes the documentation site, not the Liquid Glass material; material principles come from page text.",
+  "tokens": {
+    "spacing": {
+      "scale": [1, 3, 4, 5, 8, 9.6, 10, 11.2, 13.6, 15, 17, 20, 27.2, 40, 51.2],
+      "base_unit": 5
+    },
+    "typography": {
+      "families": ["SF Pro Text", "SF Pro Display", "Arial"],
+      "scale": [
+        { "role": "h1", "size": "40px", "weight": "700", "family": "SF Pro Display", "lineHeight": "44px", "letterSpacing": "-0.374px" },
+        { "role": "h2", "size": "19px", "weight": "600", "family": "SF Pro Display", "lineHeight": "23px", "letterSpacing": "0.228px" },
+        { "role": "h3", "size": "17px", "weight": "600", "family": "SF Pro Text", "lineHeight": "25px", "letterSpacing": "-0.374px" },
+        { "role": "body", "size": "17px", "weight": "400", "family": "SF Pro Text", "lineHeight": "25px" },
+        { "role": "caption", "size": "12px", "weight": "400", "family": "SF Pro Text" }
+      ]
+    },
+    "colors": [
+      { "role": "page-background", "value": "#FFFFFF", "note": "84.6% da area" },
+      { "role": "section-background", "value": "#F5F5F7", "note": "13.3% da area" },
+      { "role": "surface-subtle", "value": "#FAFAFC" },
+      { "role": "divider", "value": "#E8E8ED" },
+      { "role": "text-primary", "value": "#1D1D1F" },
+      { "role": "text-secondary", "value": "#515154" },
+      { "role": "text-tertiary", "value": "#86868B" },
+      { "role": "link", "value": "#0066CC" },
+      { "role": "accent-button", "value": "#0071E3", "note": "0% da area" }
+    ],
+    "radius": ["6px (19 nós)", "18px (13 nós)", "12px", "10px"],
+    "shadows": [],
+    "image_ratios": [
+      { "usage": "hero before/after", "ratio": "2.12:1" },
+      { "usage": "feature", "ratio": "2.02:1" },
+      { "usage": "sample code", "ratio": "1.33:1" }
+    ],
+    "grid": { "max_width": "993px", "columns": 3, "gutter": "20px", "template": "260px 260px 260px" },
+    "motion": {
+      "color": "0.32s cubic-bezier(0.4, 0, 0.6, 1)",
+      "background": "0.5s cubic-bezier(0.28, 0.11, 0.32, 1)",
+      "width": "0.3s ease-in",
+      "reduced_motion": true,
+      "focus_visible": true
+    }
+  },
+  "taste": [
+    {
+      "name": "Cor contida para o conteúdo atravessar o controle",
+      "trigger": "When the designers faced controls and navigation that sit over changing content and must stay legible without dyeing it",
+      "decision": "Chose a neutral control layer with colour left to the content over brand-coloured toolbars and buttons",
+      "reason": "Because a tinted control blocks what is behind it, while a neutral one lets the content infuse the material and shine through, which is what makes the surface read as glass",
+      "evidence": [
+        "page text: allow your content to infuse them and shine through",
+        "accent blue #0066CC/#0071E3 on 0% of the area",
+        "background #FFFFFF 84.6% and #F5F5F7 13.3%",
+        "text in two greys: #1D1D1F and #515154"
+      ]
+    },
+    {
+      "name": "Hierarquia por foco de conteúdo, não por ornamento",
+      "trigger": "When the designers faced a new material that could be applied to every surface at once",
+      "decision": "Chose to define layout and navigation so the most important content is in focus over spreading the effect evenly across all elements",
+      "reason": "Because material on everything removes the contrast that tells the eye what is primary; hierarchy needs a few elements that float and the rest that stay quiet",
+      "evidence": [
+        "page text: establish hierarchy, create harmony, and maintain consistency",
+        "three strong type levels (40/19/17px) and 12px for 89 nodes",
+        "zero measured shadows"
+      ]
+    },
+    {
+      "name": "Controles padrão herdam o material; só o personalizado o reimplementa",
+      "trigger": "When the designers faced thousands of existing apps that would have to be redrawn",
+      "decision": "Chose to make standard controls pick up the appearance and behaviour automatically, with custom effects as the exception, over asking every team to restyle each element",
+      "reason": "Because consistency across devices depends on one source of the material, and a bespoke glass per app breaks the shared language",
+      "evidence": [
+        "page text: standard components pick up the appearance and behavior of this material automatically",
+        "page text: adopting Liquid Glass doesn't mean reinventing your app from the ground up",
+        "Before / After section"
+      ]
+    },
+    {
+      "name": "Restraint: dois raios e nenhuma sombra no documento que explica o vidro",
+      "trigger": "When the designers faced the page that sells a luminous, fluid material and the pull to demonstrate it with glows and blurs",
+      "decision": "Chose a flat page with two radii (6px and 18px), no shadows and one link blue over a demonstration made of effects",
+      "reason": "Because the material is shown in the before/after images; the surrounding page must not compete with it",
+      "evidence": [
+        "effects.shadows empty",
+        "radii 6px (19 nodes) and 18px (13 nodes)",
+        "84.6% of the area pure white",
+        "transitions limited to colour (0.32s, 0.5s) and width"
+      ]
+    }
+  ]
+}
