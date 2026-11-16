@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>estudoTron 3000 — laboratório Liquid Glass (Etapa 0)</title>
+<!--
+  Laboratório isolado (não faz parte do app). Valida se um motor WebGL2 próprio entrega Liquid Glass
+  claramente melhor que o JavaFX atual, na tela real do estudoTron (sidebar, cabeçalho, 2 PDFs, chat).
+  Hierarquia de material: SOLID = PDFs e texto longo (DOM opaco) · FILM = sidebar, chat, barras ·
+  LENS = botões e item ativo (refração real). Abrir por servidor HTTP local.
+  Parâmetros: ?still=1 (fundo parado, render sob demanda) · ?bench=1 (mostra contador de quadros)
+-->
+<style>
+  :root { color-scheme: light; --ink:#1f2023; --ink2:#55575c; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#f4f4f6; color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden; }
+  #gl { position:fixed; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
+  .app { position:relative; z-index:1; height:100%; padding:14px; display:grid; grid-template-columns:232px 1fr; gap:14px; }
+  [data-glass] { background:transparent; border:0; color:inherit; font:inherit; will-change:transform; user-select:none; }
+  button[data-glass] { cursor:pointer; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; }
+  button:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+  .primary { color:#fff; }
+
+  /* ---- sidebar (FILM) ---- */
+  .sidebar { padding:20px 14px; display:flex; flex-direction:column; gap:6px; }
+  .brand { font-weight:700; letter-spacing:-.3px; font-size:17px; padding:2px 10px 18px; }
+  .brand small { display:block; font-weight:500; font-size:11px; color:var(--ink2); letter-spacing:0; }
+  .nav { height:44px; justify-content:flex-start !important; padding:0 14px; width:100%; }
+  .nav-plain { height:44px; display:flex; align-items:center; padding:0 14px; color:var(--ink2); font-weight:500; }
+  .sidebar .foot { margin-top:auto; font-size:11px; color:var(--ink2); padding:0 10px; }
+
+  /* ---- coluna principal ---- */
+  .main { display:grid; grid-template-rows:auto 1fr; gap:14px; min-width:0; min-height:0; }
+  .head { display:flex; align-items:center; gap:10px; padding:0 4px; }
+  .head h1 { margin:0 auto 0 4px; font-size:20px; letter-spacing:-.3px; }
+  .head .btn { height:42px; padding:0 20px; }
+  .work { display:grid; grid-template-columns:1fr 1fr 31%; gap:14px; min-height:0; }
+
+  /* ---- PDFs (SOLID): opacos, sem refração ---- */
+  /* O quadro do PDF é FILM (a GPU o desenha atrás do DOM); só a PÁGINA é sólida. Um contêiner opaco
+     esconderia o canvas e, com ele, qualquer botão de vidro dentro dele (restrição da arquitetura). */
+  .pdf { display:flex; flex-direction:column; min-width:0; min-height:0; }
+  .pdf-bar { display:flex; align-items:center; gap:8px; padding:10px 12px; }
+  .pdf-bar .name { font-weight:600; margin-right:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pdf-bar .chip { height:32px; padding:0 14px; font-size:13px; }
+  .page { margin:6px 22px 22px; background:#fff; border-radius:4px; flex:1; box-shadow:0 1px 3px rgba(0,0,0,.18); padding:34px 32px; overflow:hidden; }
+  .page h2 { margin:0 0 14px; font-size:17px; }
+  .ln { height:8px; border-radius:4px; background:#d7d8dc; margin:0 0 11px; }
+  .ln.s { width:72%; } .ln.m { width:88%; } .ln.x { width:55%; }
+  .drop { flex:1; margin:6px 22px 22px; border:2px dashed rgba(60,62,70,.35); border-radius:14px; display:flex; align-items:center; justify-content:center; color:var(--ink2); }
+
+  /* ---- chat (FILM) ---- */
+  .chat { display:flex; flex-direction:column; padding:16px; min-height:0; gap:12px; }
+  .chat h3 { margin:2px 6px 0; font-size:15px; }
+  .msgs { flex:1; display:flex; flex-direction:column; gap:12px; min-height:0; overflow:hidden; }
+  .bubble { padding:12px 16px; max-width:92%; font-size:13.5px; }
+  .bubble.me { align-self:flex-end; }
+  .bubble .ref { font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+  .composer { display:flex; align-items:center; gap:8px; }
+  .field { flex:1; height:46px; padding:0 18px; display:flex; align-items:center; color:var(--ink2); }
+  .send { width:46px; height:46px; }
+
+  .hud { position:fixed; left:14px; bottom:6px; z-index:5; font-size:11px; color:#6b6d72; }
+
+  /* Fallback (sem WebGL2, contexto perdido ou preferência por menos transparência):
+     materiais opacos e legíveis. Não é Liquid Glass; só mantém a interface utilizável. */
+  .no-gl #gl { display:none; }
+  .no-gl [data-glass] { background:rgba(255,255,255,.82); box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); -webkit-backdrop-filter:blur(14px) saturate(1.5); backdrop-filter:blur(14px) saturate(1.5); }
+  .no-gl .primary[data-glass] { background:#2a2b2f; }
+  .no-gl [data-glass][data-kind="film"] { border-radius:var(--r,24px); }
+</style>
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<div class="app">
+  <aside class="sidebar" data-glass="film" data-radius="30" data-bevel="20" data-kind="film">
+    <div class="brand">estudoTron 3000<small>Assistente de estudos</small></div>
+    <button class="nav" data-glass="lens" data-radius="22" data-bevel="20" data-kind="lens">▤ Leitor de PDFs</button>
+    <div class="nav-plain">✎ Criar Exercícios</div>
+    <div class="foot">Conteúdo dos PDFs é enviado ao provedor de IA durante o chat.</div>
+  </aside>
+
+  <div class="main">
+    <header class="head">
+      <h1>Leitor de PDFs</h1>
+      <button class="btn" data-glass="lens" data-radius="21" data-bevel="18" data-kind="lens">Carregar PDF 1</button>
+      <button class="btn" data-glass="lens" data-radius="21" data-bevel="18" data-kind="lens">Carregar PDF 2</button>
+      <button class="btn" data-glass="lens" data-radius="21" data-bevel="18" data-kind="lens">Chat</button>
+      <button class="btn primary" data-glass="lens2" data-radius="21" data-bevel="18" data-kind="lens">Configurações</button>
+    </header>
+
+    <section class="work">
+      <div class="pdf" data-glass="film" data-radius="30" data-bevel="20" data-kind="film">
+        <div class="pdf-bar">
+          <span class="name">Algoritmos_cap3.pdf</span>
+          <button class="chip" data-glass="lens" data-radius="16" data-bevel="14" data-kind="lens">‹</button>
+          <span>3 / 24</span>
+          <button class="chip" data-glass="lens" data-radius="16" data-bevel="14" data-kind="lens">›</button>
+          <button class="chip" data-glass="lens" data-radius="16" data-bevel="14" data-kind="lens">Ajustar</button>
+        </div>
+        <div class="page"><h2>3.2 Ordenação por comparação</h2>
+          <div class="ln m"></div><div class="ln"></div><div class="ln s"></div><div class="ln m"></div><div class="ln"></div><div class="ln x"></div>
+          <div class="ln m"></div><div class="ln"></div><div class="ln s"></div><div class="ln m"></div><div class="ln"></div><div class="ln x"></div>
+          <div class="ln m"></div><div class="ln"></div><div class="ln s"></div><div class="ln m"></div></div>
+      </div>
+      <div class="pdf" data-glass="film" data-radius="30" data-bevel="20" data-kind="film">
+        <div class="pdf-bar"><span class="name">Estruturas_de_dados.pdf</span></div>
+        <div class="drop">Arraste um PDF aqui</div>
+      </div>
+
+      <aside class="chat" data-glass="film" data-radius="30" data-bevel="20" data-kind="film">
+        <h3>Chat com a IA</h3>
+        <div class="msgs">
+          <div class="bubble me" data-glass="film" data-radius="20" data-bevel="14" data-kind="film">Compare o quicksort e o mergesort.</div>
+          <div class="bubble" data-glass="film" data-radius="20" data-bevel="14" data-kind="film">O mergesort garante O(n log n) no pior caso; o quicksort tem O(n²) no pior caso, mas costuma ser mais rápido na prática <span class="ref">(Algoritmos_cap3.pdf, p. 3)</span>.</div>
+        </div>
+        <div class="composer">
+          <div class="field" data-glass="film" data-radius="23" data-bevel="14" data-kind="film">Pergunte sobre os PDFs…</div>
+          <button class="send primary" data-glass="lens2" data-radius="23" data-bevel="18" data-kind="lens" aria-label="Enviar">➤</button>
+        </div>
+      </aside>
+    </section>
+  </div>
+</div>
+<div class="hud" id="hud"></div>
+
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('gl');
+  const Q = new URLSearchParams(location.search);
+  const STILL = Q.has('still');
+  const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const REDUCED_TRANSP = matchMedia('(prefers-reduced-transparency: reduce)').matches;
+  const MAXS = 24, DPR_CAP = 2;
+
+  class Spring {
+    constructor(v, zeta, omega) { this.x = v; this.v = 0; this.t = v; this.k = omega*omega; this.c = 2*zeta*omega; this.acc = 0; }
+    get rest() { return Math.abs(this.x - this.t) < 1e-3 && Math.abs(this.v) < 1e-3; }
+    step(dt) { if (this.rest) { this.x = this.t; this.v = 0; return false; } this.acc += Math.min(dt, .05); const h = 1/240;
+      while (this.acc >= h) { this.v += (-this.k*(this.x-this.t) - this.c*this.v)*h; this.x += this.v*h; this.acc -= h; } return !this.rest; }
+  }
+
+  const VS = `#version 300 es
+  in vec2 aPos; void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+  // Fundo "fluxo líquido": fios de vidro (3 fibras), faixas de luz e linhas finas de construção.
+  // Dá o que refratar aos vidros (linhas finas curvam; blur sozinho não curva).
+  const FS_BG = `#version 300 es
+  precision highp float;
+  uniform vec2 uRes; uniform float uTime; out vec4 o;
+  float sat(float x){ return clamp(x,0.0,1.0); }
+  void main(){
+    vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+    float W = uRes.x, H = uRes.y;
+    vec3 col = vec3(0.958, 0.958, 0.968);
+    // faixas largas de luz e cor suave
+    float b1 = H*0.62 + sin(p.x*0.0021 + uTime*0.10)*H*0.16;
+    col = mix(col, vec3(1.0, 0.78, 0.70), smoothstep(150.0, 0.0, abs(p.y-b1)) * 0.55);
+    float b2 = H*0.28 + sin(p.x*0.0016 - uTime*0.08 + 1.7)*H*0.14;
+    col = mix(col, vec3(0.78, 0.84, 0.98), smoothstep(130.0, 0.0, abs(p.y-b2)) * 0.5);
+    // fios de vidro: 6 feixes de 3 fibras, com reflexo iridescente
+    for (int i = 0; i < 6; i++) {
+      float fi = float(i);
+      float base = H*(0.10 + 0.16*fi);
+      float y = base + sin(p.x*(0.0030 + 0.0004*fi) + uTime*(0.07 + 0.012*fi) + fi*1.9)*H*0.09
+                     + sin(p.x*0.011 - uTime*0.05 + fi)*5.0;
+      for (int k = -1; k <= 1; k++) {
+        float d = abs(p.y - (y + float(k)*5.0));
+        float line = smoothstep(1.3, 0.0, d);
+        float irid = 0.5 + 0.5*sin(p.x*0.004 + fi*2.0 + uTime*0.12);
+        vec3 tint = mix(vec3(0.62,0.80,0.84), vec3(0.86,0.66,0.82), irid);
+        col = mix(col, mix(vec3(0.60,0.62,0.67), tint, 0.5), line * (k==0 ? 0.75 : 0.45));
+      }
+    }
+    // fios finos junto ao topo: passam atrás do cabeçalho (onde ficam os botões-lente)
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float y = 12.0 + 11.0*fi + sin(p.x*0.0055 + fi*1.3 + uTime*0.14)*9.0;
+      for (int k = -1; k <= 1; k++) {
+        float d = abs(p.y - (y + float(k)*3.0));
+        float line = smoothstep(1.2, 0.0, d);
+        float irid = 0.5 + 0.5*sin(p.x*0.005 + fi*1.7 + uTime*0.15);
+        vec3 tint = mix(vec3(0.45,0.74,0.80), vec3(0.84,0.52,0.74), irid);
+        // só atrás dos botões (lado direito): o título e a marca ficam sobre fundo calmo (legibilidade)
+        float zone = smoothstep(W*0.50, W*0.62, p.x);
+        col = mix(col, mix(vec3(0.42,0.44,0.50), tint, 0.55), line * zone * (k==0 ? 0.85 : 0.5));
+      }
+    }
+    // linhas de construção (grade fina) e tubos largos translúcidos
+    vec2 g = abs(fract(p/96.0 + 0.5) - 0.5) * 96.0;
+    col = mix(col, vec3(0.20,0.21,0.25), (1.0 - smoothstep(0.0, 1.1, min(g.x, g.y))) * 0.10);
+    float tube = abs(p.y - (H*0.88 + sin(p.x*0.0025 + uTime*0.06)*H*0.05));
+    col = mix(col, vec3(1.0), smoothstep(7.0, 2.0, tube) * 0.9);
+    col = mix(col, vec3(0.70,0.72,0.77), smoothstep(8.5, 6.5, tube) * smoothstep(5.5, 7.5, tube) * 0.5);
+    o = vec4(col, 1.0);
+  }`;
+
+  const FS_GLASS = `#version 300 es
+  precision highp float;
+  #define MAXS ${MAXS}
+  uniform sampler2D uBg; uniform vec2 uRes; uniform int uCount;
+  uniform vec4 uRect[MAXS];   // x, y, w, h
+  uniform vec4 uP[MAXS];      // raio, bisel, espessura, tipo (0 film, 1 lens, 2 lens primário)
+  uniform float uPress[MAXS];
+  uniform vec2 uLight;
+  out vec4 o;
+  vec3 bgAt(vec2 px, float lod){ vec2 q = px / uRes; return textureLod(uBg, vec2(q.x, 1.0 - q.y), lod).rgb; }
+  float sdRR(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+  void main(){
+    vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+    vec3 col = bgAt(p, 0.0);
+    for (int i = 0; i < MAXS; i++) {
+      if (i >= uCount) break;
+      vec2 c = uRect[i].xy + uRect[i].zw*0.5, b = uRect[i].zw*0.5;
+      float r = min(uP[i].x, min(b.x, b.y));
+      float d = sdRR(p - c, b, r);
+      if (d > 1.0) continue;
+      float type = uP[i].w, B = max(uP[i].y, 2.0), thick = uP[i].z;
+      float t = clamp(-d / B, 0.0, 1.0);
+      vec2 e = vec2(1.0, 0.0);
+      vec2 g = normalize(vec2(sdRR(p-c+e.xy,b,r) - sdRR(p-c-e.xy,b,r), sdRR(p-c+e.yx,b,r) - sdRR(p-c-e.yx,b,r)) + vec2(1e-5));
+      float f = sqrt(max(1.0 - (1.0-t)*(1.0-t), 0.0));
+      float fp = min((1.0 - t) / max(f, 0.05), 6.0);
+      vec3 N = normalize(vec3(thick * fp / B * g, 1.0));
+      vec3 L = normalize(vec3(normalize(uLight - c) * 0.65, 0.75));
+      vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
+      vec3 rgb;
+      float press = uPress[i];
+      if (type > 0.5) {
+        float ior = 1.42 + 0.10*press, disp = 0.035 + 0.03*press;
+        vec3 iors = vec3(ior - disp, ior, ior + disp), acc = vec3(0.0);
+        for (int k = 0; k < 3; k++) {
+          vec3 R = refract(vec3(0.0,0.0,-1.0), N, 1.0 / iors[k]);
+          vec2 off = R.xy / max(abs(R.z), 0.2) * thick * 3.4;
+          vec2 mag = (p - c) * 0.10 * smoothstep(0.0, 1.0, t);      // ampliação leve no miolo (lente convexa)
+          acc[k] = bgAt(p - off - mag, 0.0)[k];
+        }
+        rgb = acc;
+        float lum = dot(rgb, vec3(0.299,0.587,0.114));
+        rgb = mix(vec3(lum), rgb, 1.5);
+        rgb = type > 1.5 ? mix(rgb, vec3(0.17,0.18,0.20), 0.66) : mix(rgb, vec3(1.0), 0.04);
+        rgb *= 1.0 - 0.10 * pow(1.0 - t, 2.5) * smoothstep(-2.0, 2.0, -d);   // borda interna levemente mais escura (espessura do vidro)
+      } else {
+        rgb = bgAt(p, 2.8);
+        float lum = dot(rgb, vec3(0.299,0.587,0.114));
+        rgb = mix(vec3(lum), rgb, 1.5);
+        rgb = mix(rgb, vec3(1.0), 0.24);
+      }
+      rgb *= 1.03;
+      float spec = pow(max(dot(N, H), 0.0), 60.0) * (type > 0.5 ? (type > 1.5 ? 0.6 : 1.0) : 0.25);
+      float rimBand = smoothstep(2.2, 0.0, -d);
+      float lit = abs(dot(g, normalize(L.xy + 1e-4)));
+      float rim = rimBand * (0.25 + 0.75*lit) * (type > 0.5 ? 0.85 : 0.6);
+      rgb += spec*0.9 + rim;
+      col = mix(col, rgb, clamp(0.5 - d, 0.0, 1.0));
+    }
+    o = vec4(col, 1.0);
+  }`;
+
+  let gl, progBg, progGlass, vao, bgTex, bgFbo, W = 0, H = 0, ok = false, raf = 0, frames = 0;
+  const U = {};  // uniform locations
+  const els = [];
+  const light = { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0 };
+  const rects = new Float32Array(MAXS*4), prm = new Float32Array(MAXS*4), prs = new Float32Array(MAXS);
+  window.__glass = { get ok(){return ok;}, get frames(){return frames;}, get count(){return els.length;} };
+
+  const compile = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader: ' + gl.getShaderInfoLog(s)); return s; };
+  const program = (vs, fs) => { const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+    gl.bindAttribLocation(p, 0, 'aPos'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('Link: ' + gl.getProgramInfoLog(p)); return p; };
+
+  function init() {
+    gl = canvas.getContext('webgl2', { alpha:false, antialias:false, powerPreference:'high-performance' });
+    if (!gl) throw new Error('WebGL2 indisponível');
+    progBg = program(VS, FS_BG); progGlass = program(VS, FS_GLASS);
+    for (const n of ['uRes','uTime']) U['bg_'+n] = gl.getUniformLocation(progBg, n);
+    for (const n of ['uBg','uRes','uCount','uRect','uP','uPress','uLight']) U['g_'+n] = gl.getUniformLocation(progGlass, n);
+    vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    bgTex = gl.createTexture(); bgFbo = gl.createFramebuffer();
+    resize(true); ok = true;
+  }
+
+  function resize(force) {
+    const dpr = Math.min(devicePixelRatio || 1, DPR_CAP);
+    const w = Math.max(1, Math.round(innerWidth*dpr)), h = Math.max(1, Math.round(innerHeight*dpr));
+    if (!force && w === W && h === H) return;
+    W = canvas.width = w; H = canvas.height = h;
+    gl.bindTexture(gl.TEXTURE_2D, bgTex);
+    gl.texStorage2D(gl.TEXTURE_2D, Math.floor(Math.log2(Math.max(W,H)))+1, gl.RGBA8, W, H);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bgFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, bgTex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  function collect() {
+    document.querySelectorAll('[data-glass]').forEach((el) => {
+      const rec = { el, press: new Spring(0, REDUCED_MOTION ? 1 : .62, 30), clickable: el.tagName === 'BUTTON' };
+      if (rec.clickable) {
+        const down = () => { rec.press.t = 1; request(); }, up = () => { rec.press.t = 0; request(); };
+        el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up);
+        el.addEventListener('pointerleave', up); el.addEventListener('pointercancel', up);
+        el.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') down(); }); el.addEventListener('keyup', up);
+      }
+      els.push(rec);
+    });
+  }
+
+  function frame(now) {
+    raf = 0;
+    if (!ok || document.hidden) return;
+    const dt = Math.min((now - (frame.last || now))/1000, .05); frame.last = now;
+    let moving = false;
+    for (const r of els) { if (r.press.step(dt)) moving = true; if (r.clickable) r.el.style.transform = `scale(${(1 - .045*r.press.x).toFixed(4)})`; }
+    const k = 160, c = 24;
+    light.vx += (-k*(light.x - light.tx) - c*light.vx)*dt; light.vy += (-k*(light.y - light.ty) - c*light.vy)*dt;
+    light.x += light.vx*dt; light.y += light.vy*dt;
+    if (Math.abs(light.x-light.tx)+Math.abs(light.y-light.ty)+Math.abs(light.vx)+Math.abs(light.vy) > .05) moving = true;
+
+    const dpr = W / innerWidth; let n = 0;
+    for (const r of els) {
+      if (n >= MAXS) break;
+      const b = r.el.getBoundingClientRect();
+      if (b.width < 2 || b.bottom < 0 || b.top > innerHeight) continue;
+      rects.set([b.left*dpr, b.top*dpr, b.width*dpr, b.height*dpr], n*4);
+      const kind = r.el.dataset.glass, type = kind === 'lens2' ? 2 : kind === 'lens' ? 1 : 0;
+      const radius = (parseFloat(r.el.dataset.radius) || Math.min(b.width, b.height)/2) * dpr;
+      const bevel = (parseFloat(r.el.dataset.bevel) || 18) * dpr;
+      prm.set([radius, bevel, (type ? 14 : 8)*dpr, type], n*4); prs[n] = r.press.x; n++;
+    }
+    gl.bindVertexArray(vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bgFbo); gl.viewport(0,0,W,H);
+    gl.useProgram(progBg); gl.uniform2f(U.bg_uRes, W, H); gl.uniform1f(U.bg_uTime, STILL ? 0 : now/1000);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindTexture(gl.TEXTURE_2D, bgTex); gl.generateMipmap(gl.TEXTURE_2D);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,W,H);
+    gl.useProgram(progGlass); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bgTex);
+    gl.uniform1i(U.g_uBg, 0); gl.uniform2f(U.g_uRes, W, H); gl.uniform1i(U.g_uCount, n);
+    gl.uniform4fv(U.g_uRect, rects); gl.uniform4fv(U.g_uP, prm); gl.uniform1fv(U.g_uPress, prs);
+    gl.uniform2f(U.g_uLight, light.x*dpr, light.y*dpr);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    frames++;
+    if (Q.has('bench')) { (frame.dts = frame.dts || []).push(dt*1000); window.__glass.dts = frame.dts; }
+    if (moving || !STILL) request();
+  }
+  const request = () => { if (!raf && ok) raf = requestAnimationFrame(frame); };
+
+  addEventListener('pointermove', (e) => { light.tx = e.clientX; light.ty = e.clientY; request(); }, { passive:true });
+  addEventListener('resize', () => { if (ok) { resize(false); request(); } });
+  document.addEventListener('visibilitychange', () => { frame.last = 0; if (!document.hidden) request(); });
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ok = false; document.documentElement.classList.add('no-gl'); if (raf) { cancelAnimationFrame(raf); raf = 0; } });
+  canvas.addEventListener('webglcontextrestored', () => { try { init(); document.documentElement.classList.remove('no-gl'); request(); } catch (err) { console.error(err); } });
+
+  try {
+    if (REDUCED_TRANSP) throw new Error('prefers-reduced-transparency: material opaco');
+    light.x = light.tx = innerWidth*.25; light.y = light.ty = innerHeight*.05;
+    init(); collect(); request();
+  } catch (err) {
+    console.warn('Fallback CSS:', err.message);
+    document.documentElement.classList.add('no-gl');
+  }
+})();
+</script>
+</body>
+</html>

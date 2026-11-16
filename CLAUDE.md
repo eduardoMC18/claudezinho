@@ -6,6 +6,8 @@ Assistente pessoal para estudos e projetos acadêmicos. Programa desktop instala
 
 ## Status atual
 
+- **Migração do frontend em validação (16/11/2026, `docs/adr/0004-casca-electron-e-vidro-webgl2.md`):** o JavaFX continua sendo o app oficial. Em paralelo existem `lab/glass-lab/` (Etapa 0: laboratório do vidro WebGL2, 60 quadros/s medidos em Chromium com GPU real) e `desktop/` (Etapa 1: casca Electron + backend + proxy com token só no processo principal, `--selftest` passando). A regra da stack (JavaFX obrigatório) está **suspensa por autorização explícita do usuário** para esta migração; só vale a troca se houver paridade funcional e ganho visual claro. Skill de apoio: `~/.claude/skills/liquid-glass-engineer`.
+
 - Fase: **Fase 2 (IA) implementada em 13/11/2026 e validada com servidores Anthropic e Gemini FALSOS** (pytest 70/70, `mvn test` 36/36, e o app real rodando ponta a ponta contra o servidor falso: configurações, chave no Credential Manager, pergunta, streaming, Markdown, citações clicáveis, parar, erro, nova conversa). **Nenhum provedor foi testado contra a API real** (não há chaves neste ambiente): o primeiro teste real é "Configurações → colar a chave → Testar conexão", para cada provedor. **Gemini adicionado em 14/11/2026** (ver a seção de IA).
 - Fases 0 e 1 (PDFs lado a lado, SQLite/FTS5, sessão restaurada) concluídas antes.
 - Fase 0 concluída antes (PDF.js 3.11.174 legacy validado na WebView).

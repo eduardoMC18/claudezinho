@@ -1,0 +1,10 @@
+html, body { margin: 0; height: 100%; background: #f4f4f6; color: #1f2023; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 8vh auto; padding: 0 24px; }
+h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -.4px; }
+.sub { margin: 0 0 20px; color: #55575c; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+li { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; background: #fff; border-radius: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.07); }
+li .mark { width: 1.2em; font-weight: 700; }
+li.ok .mark { color: #14804a; }
+li.fail .mark { color: #b02d14; }
+li small { color: #6b6d72; margin-left: auto; }

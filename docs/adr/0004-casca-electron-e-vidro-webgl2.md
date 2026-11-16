@@ -1,0 +1,30 @@
+# ADR 0004 — Casca Electron e vidro WebGL2 (proposta em execução)
+
+Status: **em validação** (Etapas 0 e 1 feitas; decisão final de migrar depende das etapas seguintes).
+
+## Contexto
+
+O Liquid Glass em JavaFX é uma aproximação: o `DisplacementMap` roda na CPU, a imagem atrás do vidro é capturada uma vez, não há shader próprio (sem dispersão, sem refração por perfil de bisel, sem luz especular dinâmica) e o PDF.js roda num WebKit antigo (build legacy). Pedido do usuário: priorizar o melhor Liquid Glass possível, com liberdade para trocar de tecnologia.
+
+## Decisão (provisória)
+
+Frontend em **Electron + TypeScript** (React + Vite nas próximas etapas), com um **motor de vidro WebGL2 próprio** (canvas atrás do DOM, três níveis de material: Lens, Film, Solid). **Backend Python/FastAPI, SQLite, `catalog.json` e testes ficam como estão.** O PDF.js passa a rodar no Chromium (build atual, com camada de texto).
+
+## Evidências até agora
+
+- **Etapa 0** (`lab/glass-lab`): em Chromium com GPU real (RTX 3050), 60 quadros/s sem perdas com 16 superfícies; refração por pixel com dispersão e luz no cursor, impossível no JavaFX. Medida é cadência de quadros, não tempo de GPU; sem medição de memória, GPU ou CPU; sem teste em GPU integrada.
+- **Etapa 1** (`desktop/`): casca inicia o backend, proxy com token só no processo principal, SSE em streaming, `--selftest` passando (ver `desktop/README.md`).
+
+## Alternativas e por que ainda não decididas
+
+- **Tauri/WebView2:** mesmo motor Chromium no Windows, instalador menor, mas exige Rust e o WebView2 se atualiza sozinho (shader pode variar entre máquinas); em macOS cairia no WKWebView sem o efeito fiel. **Não foi medido**; deve ser comparado com o mesmo laboratório antes da decisão final.
+- **Manter JavaFX:** teto visual já atingido.
+- **Qt Quick (PySide6):** refrata conteúdo vivo (inclusive PDF), mas perde o PDF.js, exige reescrever chat/Markdown em QML e empacotar Qt.
+
+## Restrição de arquitetura descoberta na Etapa 0
+
+O canvas fica atrás do DOM; qualquer contêiner opaco esconde o vidro (e os botões de vidro dentro dele). PDFs são o único conteúdo Solid; os quadros em volta são Film. Refratar a página de um PDF real exigiria passá-la como textura (fase opcional).
+
+## Critério de parada
+
+Se, nas próximas etapas, o resultado visual não superar claramente o JavaFX ou a paridade funcional (PDFs, chat, citações, exercícios) não for atingida, o JavaFX permanece e esta casca é descartada.
