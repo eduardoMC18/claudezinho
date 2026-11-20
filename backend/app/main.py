@@ -1,10 +1,14 @@
+import logging
 from pathlib import Path
+
+import httpx
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import ai_settings, chat, documents, exercises, health, workspace
+from app.api import ai_settings, canvas, chat, documents, exercises, health, workspace
 from app.config import default_db_path
+from app.infra.canvas_repo import CanvasRepository
 from app.infra.conversations_repo import ConversationRepository
 from app.infra.db import Database
 from app.infra.documents_repo import DocumentRepository
@@ -13,6 +17,7 @@ from app.infra.settings_repo import SettingsRepository
 from app.providers.catalog import Catalog, load_catalog
 from app.providers.registry import ProviderRegistry, default_registry
 from app.services.ai_settings import AiSettingsService
+from app.services.canvas import CanvasService
 from app.services.chat import ChatService
 from app.services.chunking import CHUNKER_VERSION
 from app.services.exercises import ExerciseService
@@ -31,6 +36,7 @@ def create_app(
     secrets: SecretStore | None = None,
     registry: ProviderRegistry | None = None,
     catalog: Catalog | None = None,
+    canvas_transport: httpx.BaseTransport | None = None,
 ) -> FastAPI:
     """Monta a aplicação. `executor` define como a ingestão roda (thread; inline nos testes)."""
     # Sem docs/openapi públicos: a API é de uso interno do próprio programa.
@@ -50,9 +56,17 @@ def create_app(
 
     ingestion = IngestionService(repo, executor)
     workspace_service = WorkspaceService(repo, ingestion)
-    ai = AiSettingsService(catalog, registry or default_registry(), settings, secrets or KeyringSecretStore())
+    secret_store = secrets or KeyringSecretStore()
+    ai = AiSettingsService(catalog, registry or default_registry(), settings, secret_store)
+    canvas_service = CanvasService(
+        repo, CanvasRepository(db), settings, secret_store, ingestion,
+        cache_dir=db.path.parent / "canvas_cache", transport=canvas_transport,
+    )
+    canvas_service.sweep()  # limpeza do cache temporário na abertura
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # as URLs assinadas dos arquivos não vão para o log
 
     app.state.workspace = workspace_service
+    app.state.canvas = canvas_service
     app.state.ai_settings = ai
     app.state.conversations = conversations
     retriever = Bm25Retriever(repo)
@@ -69,6 +83,7 @@ def create_app(
 
     app.include_router(health.router)
     app.include_router(workspace.router)
+    app.include_router(canvas.router)
     app.include_router(documents.router)
     app.include_router(ai_settings.router)
     app.include_router(chat.router)

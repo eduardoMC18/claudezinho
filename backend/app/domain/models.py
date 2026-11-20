@@ -25,6 +25,9 @@ class Document:
     status: str
     pages_done: int
     error: str | None
+    source: str = "local"  # local | canvas
+    source_json: str | None = None  # metadados de origem (Canvas), JSON
+    last_page: int = 1
 
 
 class ChatError(Exception):
@@ -42,6 +45,16 @@ class WorkspaceError(Exception):
     NOT_FOUND = "not_found"
     BAD_REQUEST = "bad_request"
     INVALID_PDF = "invalid_pdf"
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.message = message
+
+
+class CanvasError(Exception):
+    """Falha ao falar com o Canvas. `kind`: not_connected, auth, forbidden, not_found, rate_limit, network,
+    bad_response, not_pdf, too_large, bad_request, changed, storage."""
 
     def __init__(self, kind: str, message: str) -> None:
         super().__init__(message)

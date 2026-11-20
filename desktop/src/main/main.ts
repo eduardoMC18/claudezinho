@@ -107,6 +107,7 @@ async function shutdown(code?: number): Promise<void> {
   quitting = true;
   sseServer?.close();
   fakeAi?.kill();
+  fakeCanvas?.kill();
   await backend?.stop();
   backend = null;
   if (code !== undefined) app.exit(code);
@@ -138,6 +139,28 @@ async function startFakeAi(): Promise<void> {
   process.env.ESTUDOTRON_SECRET_STORE = 'memory';
 }
 
+/** Autoteste: Canvas LMS FALSO (tests/fake_canvas.py). O app conversa com ele por HTTP de verdade, sem conta real. */
+let fakeCanvas: ChildProcess | null = null;
+let fakeCanvasInfo: { baseUrl: string; token: string } | null = null;
+const FAKE_CANVAS_TOKEN = '1234~TOKEN-DE-TESTE-DO-CANVAS-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+async function startFakeCanvas(): Promise<void> {
+  const dir = resolveBackendDir();
+  const port = await freePort();
+  fakeCanvas = spawn(resolvePython(dir), ['-m', 'tests.fake_canvas', String(port)], { cwd: dir, stdio: 'ignore', windowsHide: true });
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const up = await new Promise<boolean>((res) => {
+      const s = net.connect(port, '127.0.0.1');
+      s.once('connect', () => { s.destroy(); res(true); });
+      s.once('error', () => res(false));
+    });
+    if (up) break;
+    if (Date.now() > deadline) throw new Error('Canvas falso não subiu');
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  fakeCanvasInfo = { baseUrl: `http://127.0.0.1:${port}`, token: FAKE_CANVAS_TOKEN };
+}
+
 /** Autoteste: gera PDFs de teste com o PyMuPDF do backend (pasta temporária). */
 let testPdfs: Record<string, string> | null = null;
 function makeTestPdfs(): Record<string, string> {
@@ -159,6 +182,8 @@ ipcMain.handle('dialog:pickPdf', async () => {
 ipcMain.handle('app:info', () => ({
   testPdfs,
   fakeAi: fakeAi !== null,
+  /** Só no autoteste: endereço e token do Canvas FALSO. */
+  fakeCanvas: SELFTEST ? fakeCanvasInfo : null,
   selfTest: SELFTEST,
   smoke: SMOKE,
   packaged: app.isPackaged,
@@ -168,6 +193,13 @@ ipcMain.handle('app:info', () => ({
   electron: process.versions.electron,
   chromium: process.versions.chrome,
 }));
+
+/** Só no autoteste: comandos para o Canvas FALSO (atualizar arquivo, expirar token...). A página não alcança o servidor (CSP). */
+ipcMain.handle('selftest:canvasControl', async (_e, query: string) => {
+  if (!SELFTEST || !fakeCanvasInfo) return false;
+  const r = await fetch(`${fakeCanvasInfo.baseUrl}/__control?${String(query)}`);
+  return r.ok;
+});
 
 /** Só no autoteste: muda o tamanho da área útil da janela (para testar resoluções). */
 ipcMain.handle('selftest:resize', async (_e, w: number, h: number) => {
@@ -218,6 +250,7 @@ app.whenReady().then(async () => {
     } else {
       try { testPdfs = makeTestPdfs(); } catch (err) { console.error('Falha ao gerar PDFs de teste:', String(err)); }
       try { await startFakeAi(); } catch (err) { console.error('Falha ao subir a IA falsa:', String(err)); }
+      try { await startFakeCanvas(); } catch (err) { console.error('Falha ao subir o Canvas falso:', String(err)); }
     }
   }
   try {

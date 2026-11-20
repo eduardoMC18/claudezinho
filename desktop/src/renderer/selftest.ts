@@ -1247,7 +1247,248 @@ export async function runSelfTest(): Promise<void> {
     await exercisesScenario(info, check);
     await appearanceScenario(info, check);
     await layoutScenario(info, check);
+    await canvasScenario(info, check);
   }
 
   window.estudo.reportSelfTest({ ok: results.every((r) => r.ok), checks: results });
+}
+
+// ---------- Canvas LMS (contra o Canvas FALSO: nenhuma conta real é usada) ----------
+
+const cvOf = (s: 'A' | 'B') => pane(s).querySelector<HTMLElement>('.cv');
+const cvLevel = (s: 'A' | 'B') => cvOf(s)?.getAttribute('data-level');
+const cvRows = (s: 'A' | 'B', sel: string) => [...pane(s).querySelectorAll<HTMLButtonElement>(sel)];
+const cvBtn = (s: 'A' | 'B', sel: string) => pane(s).querySelector<HTMLButtonElement>(sel)!;
+const cvSection = () => document.querySelector<HTMLElement>('[data-section="canvas"]')!;
+const docName = (s: 'A' | 'B') => pane(s).querySelector('.pane-title .name')?.textContent ?? '';
+const origin = (s: 'A' | 'B') => pane(s).querySelector('[data-origin="canvas"]')?.textContent ?? '';
+type WsSlot = { id: string; name: string; source: string; last_page: number; pages: number; status: string } | null;
+const wsSlots = async () => ((await (await fetch('/api/workspace')).json()) as { slots: Record<string, WsSlot> }).slots;
+const goReader = async () => { nav('reader'); await waitFor(() => document.querySelector('.reader[data-loaded="1"]'), 8000); await sleep(300); };
+const renderedIn = (s: 'A' | 'B') => waitFor(() => pane(s).querySelector('.pdf-page[data-rendered="1"]'), 25000);
+
+async function openCanvasPdf(s: 'A' | 'B', course: number, module: string, file: number): Promise<void> {
+  if (cvLevel(s) === 'items' || cvLevel(s) === 'modules') cvBtn(s, '[data-nav="courses"]').click();
+  if (!(await waitFor(() => cvBtn(s, `[data-course="${course}"]`), 8000))) throw new Error('cartão da disciplina ausente');
+  cvBtn(s, `[data-course="${course}"]`).click();
+  if (!(await waitFor(() => cvBtn(s, `[data-module="${module}"]`), 8000))) throw new Error('módulo ausente');
+  cvBtn(s, `[data-module="${module}"]`).click();
+  if (!(await waitFor(() => cvBtn(s, `[data-file="${file}"]:not([disabled])`), 8000))) throw new Error('arquivo ausente ou inativo');
+  cvBtn(s, `[data-file="${file}"]`).click();
+  if (!(await renderedIn(s))) throw new Error('o PDF não renderizou');
+}
+
+async function canvasScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  const fc = info.fakeCanvas;
+  await check('Canvas falso ativo (nenhuma conta institucional é usada)', async () => {
+    if (!fc) throw new Error('Canvas falso não subiu');
+    return fc.baseUrl;
+  });
+  if (!fc) return;
+
+  await check('Configurações: token inválido é recusado e nada fica salvo', async () => {
+    nav('settings');
+    if (!(await waitFor(() => cvSection()?.querySelector('[data-field="canvas-url"]'), 8000))) throw new Error('seção do Canvas ausente');
+    setInput(cvSection().querySelector('[data-field="canvas-url"]')!, fc.baseUrl);
+    setInput(cvSection().querySelector('[data-field="canvas-token"]')!, 'tokeninvalido123');
+    await waitFor(() => !cvSection().querySelector('[data-action="canvas-connect"]')!.hasAttribute('disabled'), 3000);
+    cvSection().querySelector<HTMLElement>('[data-action="canvas-connect"]')!.click();
+    if (!(await waitFor(() => cvSection().querySelector('.msg.error')?.textContent?.includes('recusou'), 10000))) throw new Error('mensagem de token recusado ausente');
+    const st = (await (await fetch('/api/canvas/status')).json()) as { connected: boolean };
+    if (st.connected) throw new Error('ficou conectado com token inválido');
+  });
+
+  await check('Conectar com o token de teste: o token some da tela e não aparece em lugar nenhum da página', async () => {
+    setInput(cvSection().querySelector('[data-field="canvas-token"]')!, fc.token);
+    await waitFor(() => !cvSection().querySelector('[data-action="canvas-connect"]')!.hasAttribute('disabled'), 3000);
+    cvSection().querySelector<HTMLElement>('[data-action="canvas-connect"]')!.click();
+    if (!(await waitFor(() => cvSection().querySelector('[data-state="connected"]'), 10000))) throw new Error('não conectou');
+    const leaks: string[] = [];
+    if (document.documentElement.outerHTML.includes(fc.token)) leaks.push('DOM');
+    if (JSON.stringify(localStorage).includes(fc.token) || JSON.stringify(sessionStorage).includes(fc.token)) leaks.push('storage');
+    if ((await (await fetch('/api/canvas/status')).text()).includes(fc.token)) leaks.push('/canvas/status');
+    if (cvSection().querySelector('[data-field="canvas-token"]')) leaks.push('campo do token continua na tela');
+    if (leaks.length) throw new Error('token exposto em: ' + leaks.join(', '));
+    return cvSection().querySelector('[data-state="connected"]')!.textContent ?? '';
+  });
+  await sleep(300);
+  await window.estudo.capture('canvas-1-configuracoes');
+
+  await check('Leitor vazio: cada espaço (PDF 1 / PDF 2) oferece PDF local e as matérias do Canvas em cartões compactos', async () => {
+    await goReader();
+    await reader().clear('A');
+    await reader().clear('B');
+    nav('settings'); await sleep(200); await goReader();
+    for (const s of ['A', 'B'] as const) {
+      if (!(await waitFor(() => pane(s).querySelectorAll('.cv-course').length >= 3, 10000))) throw new Error(`${s}: cartões de matérias ausentes`);
+      if (!pane(s).querySelector('.drop')) throw new Error(`${s}: sem a opção de PDF local`);
+      const names = cvRows(s, '.cv-course').map((c) => c.querySelector('.cv-name')!.textContent);
+      if (names.join('|') !== 'Cálculo I|Curso Vazio|Física I') throw new Error(`${s}: matérias ${names.join(', ')} (o curso restrito deve ficar de fora)`);
+      const h = Math.max(...cvRows(s, '.cv-course').map((c) => c.getBoundingClientRect().height));
+      if (h > 90) throw new Error(`${s}: cartões grandes demais (${Math.round(h)} px)`);
+      const cv = cvOf(s)!.getBoundingClientRect(), pn = pane(s).getBoundingClientRect();
+      if (cv.bottom > pn.bottom + 1 || cv.right > pn.right + 1) throw new Error(`${s}: biblioteca vaza do painel`);
+    }
+    return '3 matérias em cada painel';
+  });
+  await sleep(500);
+  await window.estudo.capture('canvas-2-cursos');
+
+  await check('PDF 1 navega Disciplina → Módulos sem mexer no PDF 2', async () => {
+    cvBtn('A', '[data-course="101"]').click();
+    if (!(await waitFor(() => cvLevel('A') === 'modules' && cvRows('A', '[data-module]').length === 4, 8000))) throw new Error('módulos não apareceram');
+    const mods = cvRows('A', '[data-module]').map((m) => m.querySelector('b')!.textContent);
+    if (!mods[0]!.startsWith('Módulo 1 — Introdução') || !mods[3]!.includes('Arquivos do curso')) throw new Error(mods.join(' | '));
+    if (!pane('A').querySelector('.cv-crumbs')!.textContent!.includes('Cálculo I')) throw new Error('trilha sem a disciplina');
+    if (cvLevel('B') !== 'courses') throw new Error('o PDF 2 mudou de nível');
+    if (!cvBtn('A', '[data-module="1003"]').disabled) throw new Error('módulo bloqueado deveria estar inativo');
+  });
+  await sleep(300);
+  await window.estudo.capture('canvas-3-modulos');
+
+  await check('Módulo 1: PDFs selecionáveis (inclusive o citado numa página); docx, bloqueado, página e link ficam inativos', async () => {
+    cvBtn('A', '[data-module="1001"]').click();
+    if (!(await waitFor(() => cvLevel('A') === 'items' && cvRows('A', '[data-file="5001"]').length, 8000))) throw new Error('itens não apareceram');
+    const ok = (id: number) => !cvBtn('A', `[data-file="${id}"]`).disabled;
+    if (!ok(5001) || !ok(5003)) throw new Error('PDFs deveriam estar ativos');
+    if (ok(5002) || ok(5004)) throw new Error('docx/bloqueado deveriam estar inativos');
+    if (cvRows('A', '[data-file="5001"]').length !== 1) throw new Error('arquivo repetido apareceu mais de uma vez');
+    if (!cvBtn('A', '[data-file="5003"]').textContent!.includes('Leituras')) throw new Error('PDF da página sem a origem “Leituras”');
+    for (const kind of ['page', 'link', 'other']) {
+      const r = cvRows('A', `[data-kind="${kind}"]`);
+      if (!r.length || !r.every((b) => b.disabled)) throw new Error(`itens “${kind}” deveriam existir e ficar inativos`);
+    }
+  });
+  await sleep(300);
+  await window.estudo.capture('canvas-4-materiais');
+
+  await check('Abrir PDF do Canvas no PDF 1: renderiza, é indexado e mostra disciplina e módulo', async () => {
+    cvBtn('A', '[data-file="5001"]').click();
+    if (!(await renderedIn('A'))) throw new Error('não renderizou');
+    if (!(await waitFor(() => pane('A').querySelector('[data-status="ready"]'), 25000))) throw new Error('não chegou a "pronto"');
+    if (!docName('A').includes('Aula 01')) throw new Error('nome: ' + docName('A'));
+    if (!origin('A').includes('Cálculo I') || !origin('A').includes('Módulo 1')) throw new Error('origem: ' + origin('A'));
+    if (!(await waitFor(() => pane('A').querySelector('.textLayer')?.textContent?.includes('Aula 01 - Introdução'), 8000))) throw new Error('camada de texto sem o conteúdo do Canvas');
+    const s = await wsSlots();
+    if (s.A?.source !== 'canvas') throw new Error('o backend não marcou a origem');
+  });
+
+  await check('PDF 2 abre um PDF de OUTRA disciplina (Física I) e os dois ficam lado a lado', async () => {
+    await openCanvasPdf('B', 102, '2001', 6001);
+    if (!(await waitFor(() => pane('B').querySelector('[data-status="ready"]'), 25000))) throw new Error('B não ficou pronto');
+    if (!origin('B').includes('Física I')) throw new Error('origem B: ' + origin('B'));
+    if (docName('A') === docName('B')) throw new Error('mesmo documento nos dois');
+    const a = pane('A').getBoundingClientRect(), b = pane('B').getBoundingClientRect();
+    if (!(a.right <= b.left)) throw new Error('não estão lado a lado');
+    return `${docName('A')} | ${docName('B')}`;
+  });
+  await sleep(600);
+  await window.estudo.capture('canvas-5-dois-pdfs');
+
+  await check('Zoom e página do PDF 1 não alteram o PDF 2', async () => {
+    const zb = pct('B'), pb = pageField('B').value;
+    click('A', '[aria-label="Aumentar zoom"]');
+    click('A', '[aria-label="Próxima página"]');
+    if (!(await waitFor(() => pageField('A').value === '2', 6000))) throw new Error('página do A não mudou');
+    await sleep(300);
+    if (pct('B') !== zb || pageField('B').value !== pb) throw new Error('o PDF 2 foi afetado');
+  });
+
+  await check('Botão Canvas sobre um PDF aberto: a biblioteca volta onde parou e o PDF continua na mesma página', async () => {
+    click('A', '[data-action="library"]');
+    if (!(await waitFor(() => pane('A').querySelector('[data-overlay="library"] .cv[data-level="items"]'), 8000))) throw new Error('biblioteca não voltou ao módulo');
+    if (!pane('A').querySelector('.pdf-page')) throw new Error('o PDF foi descarregado');
+    cvBtn('A', '[data-action="close-library"]').click();
+    await waitFor(() => !pane('A').querySelector('[data-overlay="library"]'), 3000);
+    if (pageField('A').value !== '2') throw new Error('perdeu a página ao fechar a biblioteca');
+  });
+
+  await check('Substituir só o PDF 1 por outro do Canvas: o PDF 2 continua o mesmo', async () => {
+    const before = (await wsSlots()).B!.id;
+    click('A', '[data-action="library"]');
+    await waitFor(() => cvBtn('A', '[data-file="5003"]:not([disabled])'), 8000);
+    cvBtn('A', '[data-file="5003"]').click();
+    if (!(await waitFor(() => docName('A').includes('Lista de exerc'), 15000))) throw new Error('A não mudou: ' + docName('A'));
+    await renderedIn('A');
+    if ((await wsSlots()).B!.id !== before || !docName('B').includes('Movimento')) throw new Error('o PDF 2 foi afetado');
+  });
+
+  await check('Fechar só o PDF 1: volta à biblioteca onde estava e o PDF 2 segue aberto; “Disciplinas” volta ao início', async () => {
+    click('A', '[data-action="remove"]');
+    if (!(await waitFor(() => pane('A').querySelector('.pane-empty .cv[data-level="items"]'), 8000))) throw new Error('biblioteca não voltou ao último módulo');
+    if (!pane('A').querySelector('.cv-crumbs')!.textContent!.includes('Cálculo I')) throw new Error('trilha perdida');
+    if (!pane('B').querySelector('.pdf-page')) throw new Error('o PDF 2 foi fechado');
+    cvBtn('A', '[data-nav="courses"]').click();
+    if (!(await waitFor(() => cvLevel('A') === 'courses', 4000))) throw new Error('não voltou às disciplinas');
+    if (!pane('B').querySelector('.pdf-page')) throw new Error('o PDF 2 foi afetado');
+  });
+
+  await check('Sessão restaurada: o PDF do Canvas reabre na última página lida', async () => {
+    click('B', '[aria-label="Próxima página"]');
+    if (!(await waitFor(() => pageField('B').value === '2', 6000))) throw new Error('B não foi à página 2');
+    await sleep(1300); // a posição é gravada alguns instantes depois
+    nav('settings'); await sleep(300); await goReader();
+    if (!(await renderedIn('B'))) throw new Error('B não reabriu');
+    if (!(await waitFor(() => pageField('B').value === '2', 8000))) throw new Error('voltou na página ' + pageField('B').value);
+    const s = await wsSlots();
+    if (s.B?.last_page !== 2 || s.B.source !== 'canvas') throw new Error(JSON.stringify(s.B));
+  });
+
+  await check('Arquivo atualizado no Canvas: aviso, atualização e reindexação', async () => {
+    await openCanvasPdf('A', 101, '1002', 5005);
+    await waitFor(() => pane('A').querySelector('[data-status="ready"]'), 25000);
+    if (pane('A').querySelector('[data-banner="update"]')) throw new Error('aviso de atualização sem mudança');
+    if (!(await window.estudo.canvasControl('cmd=update&id=5005&topic=Termodinamica&pages=4'))) throw new Error('controle do Canvas falso falhou');
+    nav('settings'); await sleep(300); await goReader();
+    if (!(await waitFor(() => pane('A').querySelector('[data-banner="update"]'), 12000))) throw new Error('aviso de versão nova não apareceu');
+    pane('A').querySelector<HTMLElement>('[data-action="update-canvas"]')!.click();
+    if (!(await waitFor(() => !pane('A').querySelector('[data-banner="update"]'), 12000))) throw new Error('aviso não sumiu');
+    if (!(await waitFor(() => pane('A').querySelector('[data-status="ready"]') && pane('A').querySelector('.status')?.textContent?.includes('4 páginas'), 25000))) throw new Error('não reindexou: ' + pane('A').querySelector('.status')?.textContent);
+    if (!(await waitFor(() => pane('A').querySelector('.textLayer')?.textContent?.includes('Termodinamica'), 15000))) throw new Error('o PDF novo não foi exibido');
+  });
+
+  await check('Token expirado: mensagem clara com atalho para Configurações; o PDF aberto continua legível', async () => {
+    await window.estudo.canvasControl('cmd=expire');
+    click('B', '[data-action="library"]');
+    await waitFor(() => pane('B').querySelector('[data-overlay="library"] [data-action="refresh"]'), 6000);
+    cvBtn('B', '[data-action="refresh"]').click();
+    if (!(await waitFor(() => pane('B').querySelector('.cv-error')?.textContent?.includes('recusou o token'), 10000))) throw new Error('mensagem de token expirado ausente');
+    if (!pane('B').querySelector('.cv-error button.primary')) throw new Error('sem atalho para Configurações');
+    await window.estudo.capture('canvas-6-erro');
+    if (!pane('B').querySelector('.pdf-page')) throw new Error('o PDF aberto sumiu enquanto o token estava expirado');
+    await window.estudo.canvasControl('cmd=restore');
+    cvBtn('B', '[data-action="retry"]').click();
+    if (!(await waitFor(() => !pane('B').querySelector('.cv-error') && pane('B').querySelector('[data-overlay="library"] .cv-row, [data-overlay="library"] .cv-course'), 10000))) throw new Error('não se recuperou ao tentar de novo');
+    cvBtn('B', '[data-action="close-library"]').click();
+    await waitFor(() => !pane('B').querySelector('[data-overlay="library"]'), 3000);
+    if (!pane('B').querySelector('.pdf-page')) throw new Error('o PDF aberto sumiu');
+  });
+
+  await check('PDF removido no Canvas: a lista mostra o erro e o painel não muda', async () => {
+    await window.estudo.canvasControl('cmd=status&id=5006&code=404');
+    const before = docName('A');
+    click('A', '[data-action="library"]');
+    if (!(await waitFor(() => pane('A').querySelector('[data-overlay="library"] [data-file="5006"]:not([disabled])'), 8000))) throw new Error('lista do módulo não apareceu');
+    cvBtn('A', '[data-file="5006"]').click();
+    if (!(await waitFor(() => pane('A').querySelector('[data-error="open"]')?.textContent?.includes('removido'), 10000))) throw new Error('mensagem de arquivo removido ausente');
+    if (docName('A') !== before) throw new Error('o painel mudou');
+    await window.estudo.canvasControl('cmd=restore');
+    cvBtn('A', '[data-action="close-library"]').click();
+  });
+
+  await check('Desconectar: token, PDFs do Canvas e cache saem; o Leitor pede para conectar', async () => {
+    nav('settings');
+    await waitFor(() => cvSection()?.querySelector('[data-action="canvas-disconnect"]'), 6000);
+    cvSection().querySelector<HTMLElement>('[data-action="canvas-disconnect"]')!.click();
+    if (!(await waitFor(() => cvSection().querySelector('[data-field="canvas-url"]'), 8000))) throw new Error('formulário de conexão não voltou');
+    const r = await fetch('/api/canvas/courses');
+    if (r.status !== 409) throw new Error('/canvas/courses deveria responder 409, respondeu ' + r.status);
+    const s = await wsSlots();
+    if (s.A || s.B) throw new Error('PDFs do Canvas continuam nos painéis');
+    await goReader();
+    if (!(await waitFor(() => pane('A').querySelector('.cv[data-level="disconnected"]') && pane('B').querySelector('.cv[data-level="disconnected"]'), 8000))) throw new Error('painéis não pedem a conexão');
+    if (!pane('A').querySelector('.drop')) throw new Error('PDF local deixou de ser oferecido');
+    pane('A').querySelector<HTMLElement>('[data-action="connect-canvas"]')!.click();
+    if (!(await waitFor(() => document.querySelector('[data-section="canvas"]'), 4000))) throw new Error('o atalho não abriu as Configurações');
+  });
 }

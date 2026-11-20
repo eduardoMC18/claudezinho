@@ -24,7 +24,7 @@ def test_migrations_are_idempotent(db_path: Path) -> None:
     with db.session() as conn:
         versions = [r[0] for r in conn.execute("SELECT version FROM schema_migrations")]
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert versions == [1, 2]
+    assert versions == [1, 2, 3]
     assert {"workspace", "document", "chunk", "chunk_fts", "setting", "conversation", "message"} <= tables
 
 

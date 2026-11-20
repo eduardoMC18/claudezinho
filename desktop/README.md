@@ -146,6 +146,10 @@ Origem: `docs/design-dna/` (GlassCN, Apple Liquid Glass, GlassyUI e a página `g
 
 **Limites:** o app **JavaFX** (`frontend/`) tem o mesmo tipo de fundo (`AmbientBackground` + `FlowField`) e **não foi alterado**; a referência visual citada no pedido não chegou como imagem, então segui a descrição; o contraste do texto sobre as películas não foi medido de novo com o novo material.
 
+## Canvas LMS (20/11/2026)
+
+Cada painel do Leitor tem a biblioteca do Canvas (Disciplinas → Módulos → Materiais) e a opção de PDF local; o PDF escolhido abre direto no PDF.js, é indexado e funciona no chat/exercícios como qualquer outro. Conexão por token pessoal em Configurações (token só no backend/Credential Manager). Detalhes, endpoints e limites em `docs/adr/0005-integracao-canvas-lms.md`. Testes: `backend/tests/test_canvas.py` (Canvas FALSO em `backend/tests/fake_canvas.py`, também usado pelo `--selftest`, 100 checks). Capturas: `docs/screenshots/electron-canvas-*.png`. **Nunca testado contra um Canvas real.**
+
 ## Comandos (PowerShell)
 
 ```powershell

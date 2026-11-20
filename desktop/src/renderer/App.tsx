@@ -34,7 +34,7 @@ export function App() {
       <div className="app" data-sidebar={sidebar.collapsed ? 'collapsed' : 'expanded'}>
         <Sidebar screen={screen} onSelect={setScreen} collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
         <div className="main">
-          {screen === 'reader' && <Reader chat={chat} pending={pending} onPendingDone={() => setPending(null)} />}
+          {screen === 'reader' && <Reader chat={chat} pending={pending} onPendingDone={() => setPending(null)} onOpenSettings={() => setScreen('settings')} />}
           {screen === 'exercises' && (
             <Exercises onOpenReader={() => setScreen('reader')} onOpenSettings={() => setScreen('settings')} onOpenReference={openReference} />
           )}

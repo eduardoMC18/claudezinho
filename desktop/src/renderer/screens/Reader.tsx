@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { workspace, type DocumentInfo, type SlotId } from '../api';
+import { canvas, workspace, type CanvasOpen, type CanvasStatus, type DocumentInfo, type SlotId } from '../api';
 import type { ChatApi } from '../chat/useChat';
 import { GlassButton } from '../ui/GlassButton';
 import { ChatPanel, type CiteTarget } from './ChatPanel';
@@ -11,7 +11,7 @@ const EMPTY: Slots = { A: null, B: null };
 const NARROW_W = 1040;
 
 /** Leitor de PDFs: dois visualizadores independentes lado a lado, divisor ajustável, chat à direita. */
-export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pending: CiteTarget | null; onPendingDone(): void }) {
+export function Reader({ chat, pending, onPendingDone, onOpenSettings }: { chat: ChatApi; pending: CiteTarget | null; onPendingDone(): void; onOpenSettings(): void }) {
   const [slots, setSlots] = useState<Slots>(EMPTY);
   const [errors, setErrors] = useState<Record<SlotId, string | null>>({ A: null, B: null });
   const [ratio, setRatio] = useState(0.5);
@@ -30,6 +30,12 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
     const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < NARROW_W));
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+  const [canvasStatus, setCanvasStatus] = useState<CanvasStatus | null>(null);
+  useEffect(() => {
+    let alive = true;
+    canvas.status().then((s) => { if (alive) setCanvasStatus(s); }).catch(() => { if (alive) setCanvasStatus({ connected: false, base_url: null, user_name: null, auto_refresh: true }); });
+    return () => { alive = false; };
   }, []);
   const paneA = useRef<ViewerPaneHandle>(null);
   const paneB = useRef<ViewerPaneHandle>(null);
@@ -76,6 +82,23 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
     if (path) await setPath(slot, path);
   }, [setPath]);
 
+  /** PDF do Canvas num painel: só aquele painel muda; o outro continua como está. */
+  const openCanvas = useCallback(async (slot: SlotId, req: CanvasOpen) => {
+    setErr(slot, null);
+    const doc = await canvas.openInSlot(slot, req); // erros sobem para a biblioteca mostrar na lista
+    setSlots((s) => ({ ...s, [slot]: doc }));
+    setWarning(null);
+  }, []);
+
+  const reload = useCallback(async (slot: SlotId) => {
+    const id = slots[slot]?.id;
+    if (!id) return;
+    try {
+      const d = await workspace.document(id);
+      setSlots((s) => (s[slot]?.id === d.id ? { ...s, [slot]: d } : s));
+    } catch { /* o documento pode ter sido substituído */ }
+  }, [slots]);
+
   const clear = useCallback(async (slot: SlotId) => {
     setErr(slot, null);
     try {
@@ -88,9 +111,9 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
 
   // gancho de teste: o autoteste carrega arquivos pelo mesmo caminho do seletor/arrastar
   useEffect(() => {
-    (window as unknown as { __reader?: unknown }).__reader = { setPath, clear };
+    (window as unknown as { __reader?: unknown }).__reader = { setPath, clear, openCanvas };
     return () => { delete (window as unknown as { __reader?: unknown }).__reader; };
-  }, [setPath, clear]);
+  }, [setPath, clear, openCanvas]);
 
   /** Clique numa citação: leva o PDF à página; avisa se o documento foi substituído/removido desde a resposta. */
   const onCite = useCallback((t: CiteTarget) => {
@@ -144,7 +167,8 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
           className="pdfs"
           style={{ gridTemplateColumns: `minmax(0, ${ratio}fr) 12px minmax(0, ${1 - ratio}fr)` }}
         >
-          <ViewerPane ref={paneA} slot="A" doc={slots.A} error={errors.A} onPick={pick} onPath={setPath} onClear={clear} />
+          <ViewerPane ref={paneA} slot="A" doc={slots.A} error={errors.A} onPick={pick} onPath={setPath} onClear={clear}
+            canvasStatus={canvasStatus} onOpenSettings={onOpenSettings} onOpenCanvas={openCanvas} onReload={reload} />
           <div
             className="divider"
             role="separator"
@@ -154,7 +178,8 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
             onPointerDown={dragFrom}
             onKeyDown={keyDivider}
           />
-          <ViewerPane ref={paneB} slot="B" doc={slots.B} error={errors.B} onPick={pick} onPath={setPath} onClear={clear} />
+          <ViewerPane ref={paneB} slot="B" doc={slots.B} error={errors.B} onPick={pick} onPath={setPath} onClear={clear}
+            canvasStatus={canvasStatus} onOpenSettings={onOpenSettings} onOpenCanvas={openCanvas} onReload={reload} />
         </div>
         {showChat && (
           <ChatPanel chat={chat} hasDocs={hasDocs} warning={warning} onCite={onCite}

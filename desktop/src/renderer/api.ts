@@ -44,6 +44,23 @@ export interface DocumentInfo {
   error: string | null;
   /** ok | modified | missing */
   file_state: 'ok' | 'modified' | 'missing';
+  source: 'local' | 'canvas';
+  /** origem do documento quando vem do Canvas (sem URLs nem credenciais) */
+  canvas: CanvasOrigin | null;
+  /** última página lida (restaura a sessão) */
+  last_page: number;
+}
+
+export interface CanvasOrigin {
+  institution: string | null;
+  course_id: number;
+  course_name: string;
+  course_code: string;
+  module_id: string;
+  module_name: string;
+  file_id: number;
+  display_name: string;
+  remote_modified_at: string | null;
 }
 
 export const workspace = {
@@ -52,6 +69,43 @@ export const workspace = {
   clearSlot: (slot: SlotId) => api<void>(`/workspace/slots/${slot}`, { method: 'DELETE' }),
   document: (id: string) => api<DocumentInfo>(`/documents/${encodeURIComponent(id)}`),
   fileUrl: (id: string) => `/api/documents/${encodeURIComponent(id)}/file`,
+};
+
+// ---- Canvas LMS (o token fica só no backend; aqui nunca aparece) ----
+
+export interface CanvasStatus { connected: boolean; base_url: string | null; user_name: string | null; auto_refresh: boolean }
+export interface CanvasCourse { id: number; name: string; short_name: string; code: string; published: boolean; state: string; term: string | null }
+export interface CanvasModule { id: string; name: string; position: number; items_count: number | null; locked: boolean; kind: 'module' | 'files' }
+export interface CanvasItem {
+  key: string;
+  kind: 'pdf' | 'file' | 'page' | 'link' | 'header' | 'other';
+  title: string;
+  indent: number;
+  file_id: number | null;
+  size: number | null;
+  modified_at: string | null;
+  available: boolean;
+  reason: string | null;
+  via: string | null;
+}
+export interface Cached<T> { data: T; fetched_at: number; stale: boolean; warning: string | null }
+export interface CanvasOpen { course_id: number; module_id: string; file_id: number; course_name: string; module_name: string }
+export interface CanvasPrepare { ok: boolean; update_available: boolean; refreshed: boolean; warning?: string | null }
+
+const q = (refresh: boolean) => (refresh ? '?refresh=true' : '');
+export const canvas = {
+  status: () => api<CanvasStatus>('/canvas/status'),
+  connect: (base_url: string, token: string) => api<CanvasStatus>('/canvas/connection', { method: 'PUT', json: { base_url, token } }),
+  disconnect: () => api<void>('/canvas/connection', { method: 'DELETE' }),
+  setAutoRefresh: (auto_refresh: boolean) => api<CanvasStatus>('/canvas/preferences', { method: 'PUT', json: { auto_refresh } }),
+  courses: (refresh = false) => api<Cached<CanvasCourse[]>>('/canvas/courses' + q(refresh)),
+  modules: (courseId: number, refresh = false) => api<Cached<CanvasModule[]>>(`/canvas/courses/${courseId}/modules` + q(refresh)),
+  items: (courseId: number, moduleId: string, refresh = false) =>
+    api<Cached<CanvasItem[]>>(`/canvas/courses/${courseId}/modules/${encodeURIComponent(moduleId)}/items` + q(refresh)),
+  openInSlot: (slot: SlotId, body: CanvasOpen) => api<DocumentInfo>(`/canvas/slots/${slot}`, { method: 'PUT', json: body }),
+  prepare: (docId: string) => api<CanvasPrepare>(`/canvas/documents/${encodeURIComponent(docId)}/prepare`, { method: 'POST' }),
+  refreshDoc: (docId: string) => api<{ ok: boolean; updated: boolean }>(`/canvas/documents/${encodeURIComponent(docId)}/refresh`, { method: 'POST' }),
+  progress: (docId: string, page: number) => api<void>(`/documents/${encodeURIComponent(docId)}/progress`, { method: 'PUT', json: { page } }),
 };
 
 // ---- Exercícios ----

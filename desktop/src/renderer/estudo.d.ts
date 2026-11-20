@@ -7,6 +7,7 @@ interface EstudoBridge {
     windowVisible: boolean;
     testPdfs: Record<string, string> | null;
     fakeAi: boolean;
+    fakeCanvas: { baseUrl: string; token: string } | null;
     smoke: boolean;
     packaged: boolean;
     electron: string;
@@ -15,6 +16,7 @@ interface EstudoBridge {
   reportSelfTest(result: unknown): void;
   /** Só no autoteste com --shots=<pasta>: salva uma captura da janela. Retorna o caminho ou null. */
   capture(name: string): Promise<string | null>;
+  canvasControl(query: string): Promise<boolean>;
   resize(w: number, h: number): Promise<[number, number] | null>;
   pickPdf(): Promise<string | null>;
   pathForFile(file: File): string;

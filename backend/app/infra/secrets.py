@@ -13,7 +13,7 @@ import keyring.errors
 SERVICE_NAME = "estudoTron3000"
 
 # Padrão de chaves conhecidas, usado para censurar qualquer vazamento acidental em logs.
-_KEY_PATTERN = re.compile(r"sk-ant-[A-Za-z0-9_\-]{6,}|AIza[0-9A-Za-z_\-]{20,}")
+_KEY_PATTERN = re.compile(r"sk-ant-[A-Za-z0-9_\-]{6,}|AIza[0-9A-Za-z_\-]{20,}|\d{1,6}~[A-Za-z0-9_-]{20,}|Bearer\s+[A-Za-z0-9~_\-\.]{16,}")
 
 
 class SecretStoreError(Exception):
@@ -79,4 +79,12 @@ def api_key_secret_name(provider_id: str) -> str:
 
 def redact(text: str) -> str:
     """Substitui qualquer chave reconhecível por um marcador."""
-    return _KEY_PATTERN.sub(lambda m: "sk-ant-***" if m.group(0).startswith("sk-") else "AIza***", text)
+    def mask(m: "re.Match[str]") -> str:
+        g = m.group(0)
+        if g.startswith("sk-"):
+            return "sk-ant-***"
+        if g.startswith("AIza"):
+            return "AIza***"
+        return "Bearer ***" if g.startswith("Bearer") else "canvas-token-***"
+
+    return _KEY_PATTERN.sub(mask, text)

@@ -85,6 +85,8 @@ class WorkspaceService:
     @staticmethod
     def file_state(doc: Document) -> str:
         """Compara o arquivo em disco com o que foi carregado (tamanho/mtime e, se preciso, hash)."""
+        if doc.source == "canvas":
+            return FILE_OK  # vive no cache temporário; se foi limpo, é baixado de novo ao abrir
         path = Path(doc.path)
         try:
             stat = path.stat()

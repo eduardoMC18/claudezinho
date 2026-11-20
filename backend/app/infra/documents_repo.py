@@ -7,7 +7,7 @@ from app.infra.db import Database
 
 _COLUMNS = (
     "id, workspace_id, slot, path, name, sha256, size_bytes, mtime_ns, "
-    "pages, title, status, pages_done, error"
+    "pages, title, status, pages_done, error, source, source_json, last_page"
 )
 
 
@@ -51,11 +51,11 @@ class DocumentRepository:
         with self._db.session() as conn:
             self._delete_slot(conn, doc.workspace_id, doc.slot)
             conn.execute(
-                f"INSERT INTO document ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                f"INSERT INTO document ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     doc.id, doc.workspace_id, doc.slot, doc.path, doc.name, doc.sha256,
                     doc.size_bytes, doc.mtime_ns, doc.pages, doc.title, doc.status,
-                    doc.pages_done, doc.error,
+                    doc.pages_done, doc.error, doc.source, doc.source_json, doc.last_page,
                 ),
             )
 
@@ -94,6 +94,30 @@ class DocumentRepository:
     def set_status(self, doc_id: str, status: str, error: str | None = None) -> None:
         with self._db.session() as conn:
             conn.execute("UPDATE document SET status = ?, error = ? WHERE id = ?", (status, error, doc_id))
+
+    def set_last_page(self, doc_id: str, page: int) -> None:
+        with self._db.session() as conn:
+            conn.execute("UPDATE document SET last_page = ? WHERE id = ?", (max(1, page), doc_id))
+
+    def update_content(self, doc_id: str, *, sha256: str, size_bytes: int, mtime_ns: int, pages: int,
+                       title: str | None, source_json: str | None) -> None:
+        """Troca o conteúdo de um documento (ex.: arquivo atualizado no Canvas): apaga os trechos e reinicia a indexação."""
+        with self._db.session() as conn:
+            conn.execute("DELETE FROM chunk WHERE document_id = ?", (doc_id,))
+            conn.execute(
+                "UPDATE document SET sha256=?, size_bytes=?, mtime_ns=?, pages=?, title=?, status=?, pages_done=0, "
+                "error=NULL, source_json=? WHERE id=?",
+                (sha256, size_bytes, mtime_ns, pages, title, STATUS_PROCESSING, source_json, doc_id),
+            )
+
+    def set_source_json(self, doc_id: str, source_json: str) -> None:
+        with self._db.session() as conn:
+            conn.execute("UPDATE document SET source_json = ? WHERE id = ?", (source_json, doc_id))
+
+    def by_source(self, source: str) -> list[Document]:
+        with self._db.session() as conn:
+            rows = conn.execute(f"SELECT {_COLUMNS} FROM document WHERE source = ?", (source,)).fetchall()
+        return [_to_document(r) for r in rows]
 
     def processing_ids(self) -> list[str]:
         with self._db.session() as conn:
