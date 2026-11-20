@@ -118,7 +118,7 @@ export class GlassEngine {
     this.progBg = this.program(VS, FS_BG);
     this.progGlass = this.program(VS, FS_GLASS);
     for (const n of ['uRes', 'uTime']) this.loc['bg_' + n] = gl.getUniformLocation(this.progBg, n);
-    for (const n of ['uBg', 'uRes', 'uCount', 'uRect', 'uP', 'uPress', 'uLight', 'uThickness', 'uTint', 'uDisp']) this.loc['g_' + n] = gl.getUniformLocation(this.progGlass, n);
+    for (const n of ['uBg', 'uRes', 'uCount', 'uRect', 'uP', 'uPress', 'uLight', 'uThickness', 'uTint', 'uDisp', 'uDpr']) this.loc['g_' + n] = gl.getUniformLocation(this.progGlass, n);
     gl.bindVertexArray(gl.createVertexArray());
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
@@ -328,6 +328,7 @@ export class GlassEngine {
     gl.uniform1f(loc.g_uThickness, this.cfg.thickness);
     gl.uniform1f(loc.g_uTint, this.cfg.tinted ? 1 : 0);
     gl.uniform1f(loc.g_uDisp, TIERS[this.cfg.quality].dispersion ? 1 : 0);
+    gl.uniform1f(loc.g_uDpr, dpr);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // sondas de pixel (testes): lidas logo após o desenho, antes de o quadro ser composto

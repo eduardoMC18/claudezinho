@@ -304,16 +304,89 @@ async function exercisesScenario(info: Awaited<ReturnType<EstudoBridge['info']>>
   const pdfs = info.testPdfs!;
   const bothReady = () => pane('A').querySelector('[data-status="ready"]') && pane('B').querySelector('[data-status="ready"]');
 
-  await check('Sem PDFs: o início explica e leva ao Leitor de PDFs', async () => {
+  await check('Sem PDFs: o início explica o que fazer, com o título no topo', async () => {
     await reader().clear('A');
     await reader().clear('B');
     nav('exercises');
     const p = await waitFor(() => exEl()?.querySelector('[data-status-panel="info"]'), 6000);
     if (!p || !p.textContent!.includes('Carregue um PDF primeiro')) throw new Error('painel de PDF ausente não apareceu');
     if (exEl()!.querySelector('[data-mode]')) throw new Error('as modalidades não deveriam aparecer sem PDFs');
+    const h1 = document.querySelector('.main .head h1')!.getBoundingClientRect();
+    if (h1.top > 60) throw new Error('o título não está na região superior');
+    return 'painel informativo; título "Criar Exercícios" no topo';
+  });
+
+  /** Posição do cartão em relação ao centro da ÁREA ÚTIL (coluna principal, abaixo do cabeçalho). */
+  const centerReport = (sel = '[data-status-panel]') => {
+    const area = exEl()!.getBoundingClientRect();
+    const card = exEl()!.querySelector<HTMLElement>(sel)!.getBoundingClientRect();
+    return { dx: card.left + card.width / 2 - (area.left + area.width / 2), dy: card.top + card.height / 2 - (area.top + area.height / 2), area, card };
+  };
+  const centeredOk = (tag: string) => {
+    const r = centerReport();
+    const sbRight = document.querySelector('.sidebar')!.getBoundingClientRect().right;
+    if (Math.abs(r.dx) > 1 || Math.abs(r.dy) > 1) throw new Error(`${tag}: cartão deslocado (dx ${r.dx.toFixed(1)}, dy ${r.dy.toFixed(1)})`);
+    if (r.area.left < sbRight - 0.5) throw new Error(`${tag}: a área útil inclui a barra lateral`);
+    if (r.card.width > 600 || r.card.height > 300) throw new Error(`${tag}: cartão grande demais (${Math.round(r.card.width)}×${Math.round(r.card.height)})`);
+    const btn = exEl()!.querySelector<HTMLElement>('[data-action="to-reader"]')!.getBoundingClientRect();
+    if (btn.bottom > window.innerHeight || btn.right > window.innerWidth || btn.width < 100) throw new Error(`${tag}: botão fora da tela`);
+    return `${Math.round(r.card.width)}×${Math.round(r.card.height)}px, dx ${r.dx.toFixed(2)}, dy ${r.dy.toFixed(2)}`;
+  };
+
+  await check('Estado vazio centralizado na área útil: barra expandida e recolhida', async () => {
+    const out: string[] = [];
+    if (document.querySelector('.sidebar')!.getAttribute('data-collapsed') === '1') { document.querySelector<HTMLElement>('[data-action="toggle-sidebar"]')!.click(); await sleep(500); }
+    out.push('expandida ' + centeredOk('expandida'));
+    await window.estudo.capture('18-exercicios-vazio-expandida');
+    document.querySelector<HTMLElement>('[data-action="toggle-sidebar"]')!.click(); // recolhe
+    // durante a animação o cartão acompanha a coluna: nunca deslocado
+    let worst = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 520) { worst = Math.max(worst, Math.abs(centerReport().dx), Math.abs(centerReport().dy)); await sleep(16); }
+    if (worst > 1.5) throw new Error(`durante a animação o cartão saiu do centro (${worst.toFixed(1)} px)`);
+    out.push('recolhida ' + centeredOk('recolhida'));
+    await window.estudo.capture('19-exercicios-vazio-recolhida');
+    document.querySelector<HTMLElement>('[data-action="toggle-sidebar"]')!.click(); // volta a expandir
+    await sleep(520);
+    return out.join(' | ') + ` | desvio máximo na animação ${worst.toFixed(2)} px`;
+  });
+  await check('Estado vazio centralizado em várias janelas (1440×900, 1280×800, 1100×720, 980×600)', async () => {
+    const out: string[] = [];
+    for (const [w, h] of [[1280, 800], [1100, 720], [980, 600], [1440, 900]] as Array<[number, number]>) {
+      await window.estudo.resize(w, h);
+      await sleep(450);
+      out.push(`${w}×${h}: ${centeredOk(`${w}×${h}`)}`);
+      if (w === 980) await window.estudo.capture('20-exercicios-vazio-980x600');
+    }
+    return out.join(' | ');
+  });
+  await check('Fundo limpo: sem linhas, grade, ondas nem cor saturada (pixels lidos da GPU)', async () => {
+    if (!info.windowVisible) return 'IGNORADA: janela oculta suspende o desenho (use --show)';
+    const eng = window.__glass!.engine!;
+    const area = exEl()!.getBoundingClientRect();
+    const card = exEl()!.querySelector('[data-status-panel]')!.getBoundingClientRect();
+    // duas varreduras em regiões sem nenhuma superfície: faixa direita e faixa inferior da área útil
+    const pts: Array<[number, number]> = [];
+    for (let y = area.top + 8; y < area.bottom - 8; y += 5) pts.push([area.right - 40, y]);
+    if (card.bottom > area.bottom - 30) throw new Error('o cartão ocupa a faixa inferior: varredura inválida');
+    for (let x = area.left + 8; x < area.right - 8; x += 5) pts.push([x, area.bottom - 14]);
+    const px = await Promise.all(pts.map(([x, y]) => eng.probe(x, y)));
+    const L = px.map(lum);
+    let step = 0;
+    for (let i = 1; i < L.length; i++) if (pts[i][0] === pts[i - 1][0] || pts[i][1] === pts[i - 1][1]) step = Math.max(step, Math.abs(L[i] - L[i - 1]));
+    const range = Math.max(...L) - Math.min(...L);
+    const chroma = Math.max(...px.map((c) => Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2])));
+    const mean = L.reduce((a, b) => a + b, 0) / L.length;
+    if (step > 3) throw new Error(`variação brusca entre pontos vizinhos (${step.toFixed(1)}): há linha ou borda no fundo`);
+    if (range > 24) throw new Error(`amplitude de luminosidade grande demais (${range.toFixed(1)})`);
+    if (chroma > 10) throw new Error(`cor saturada no fundo (croma ${chroma})`);
+    if (mean < 228) throw new Error(`fundo escuro demais (${mean.toFixed(0)})`);
+    return `${pts.length} pontos: luminância média ${mean.toFixed(1)}, amplitude ${range.toFixed(1)}, maior salto entre vizinhos ${step.toFixed(1)}, croma máx ${chroma} (de 255)`;
+  });
+  await check('O botão "Ir para o Leitor de PDFs" leva ao Leitor', async () => {
     exAct('to-reader').click();
     if (!(await waitFor(() => document.querySelector('.reader'), 4000))) throw new Error('não foi para o Leitor');
-    return 'painel informativo + botão para o Leitor';
+    return 'abriu o Leitor';
   });
 
   await reader().setPath('A', pdfs.texto);
@@ -460,6 +533,8 @@ async function exercisesScenario(info: Awaited<ReturnType<EstudoBridge['info']>>
       const loading = await waitFor(() => exEl()?.querySelector('[data-status-panel="loading"]'), 2000);
       if (!loading || !loading.textContent!.includes('Gerando sua questão')) throw new Error('painel de carregamento ausente');
       if (!loading.textContent!.includes('texto.pdf')) throw new Error('o carregamento não cita os PDFs lidos');
+      const lc = centerReport();
+      if (Math.abs(lc.dx) > 1 || Math.abs(lc.dy) > 1) throw new Error(`painel de carregamento deslocado (dx ${lc.dx.toFixed(1)}, dy ${lc.dy.toFixed(1)})`);
       const back = await waitFor(() => backBtn(), 1000);
       if (!back) throw new Error('botão Início ausente durante a geração');
       back.click(); // volta ANTES de a questão chegar
@@ -482,6 +557,8 @@ async function exercisesScenario(info: Awaited<ReturnType<EstudoBridge['info']>>
     if (!p) throw new Error(`sem painel de erro (estágio ${stage()})`);
     const title = p.querySelector('h2')!.textContent;
     if (title !== 'Chave do Gemini não configurada') throw new Error(`título: ${title}`);
+    const ec = centerReport();
+    if (Math.abs(ec.dx) > 1 || Math.abs(ec.dy) > 1) throw new Error(`painel de erro deslocado (dx ${ec.dx.toFixed(1)}, dy ${ec.dy.toFixed(1)})`);
     if (!exAct('to-settings') || !exAct('home')) throw new Error('faltam os botões');
     exAct('to-settings').click();
     if (!(await waitFor(() => document.querySelector('[data-provider]'), 5000))) throw new Error('não abriu Configurações');

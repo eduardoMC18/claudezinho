@@ -231,6 +231,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 
 /* ---- Criar Exercícios ---- */
 .exercises { max-width: 920px; width: 100%; }
+/* Estado de painel único: ocupa a área útil inteira e centraliza o cartão nos dois eixos (sem margens fixas).
+   Padding simétrico, senão o centro óptico ficaria deslocado alguns pixels. */
+.screen[data-centered="1"] { max-width: none; padding: 0; align-content: center; justify-items: center; }
+.screen[data-centered="1"] .ex-home { width: 100%; justify-items: center; }
+.screen[data-centered="1"] .status-panel { margin: 0; }
 .ex-home { display: grid; gap: 14px; }
 .ex-h { margin: 6px 4px 0; font-size: 14px; color: var(--ink-2); font-weight: 600; letter-spacing: 0; }
 .source-cards { display: flex; flex-wrap: wrap; gap: 10px; }

@@ -107,6 +107,9 @@ export function Exercises({ onOpenReader, onOpenSettings, onOpenReference }: Pro
   const allNoText = docs.length > 0 && docs.every((d) => d.status === 'no_text');
   const ready = docs.length > 0 && !indexing && !allNoText;
   const modeTitle = kind === 'objective' ? 'Exercícios objetivos' : 'Exercícios subjetivos';
+  // Estados de painel único (sem PDFs, gerando, erro): o cartão fica no centro da ÁREA ÚTIL (coluna principal,
+  // abaixo do cabeçalho), por Grid; a barra lateral recolhida/expandida muda a coluna e o cartão acompanha.
+  const centered = stage === 'loading' || stage === 'error' || (stage === 'home' && docsLoaded && docs.length === 0);
 
   return (
     <>
@@ -117,7 +120,7 @@ export function Exercises({ onOpenReader, onOpenSettings, onOpenReference }: Pro
         <h1>{stage === 'home' ? 'Criar Exercícios' : modeTitle}</h1>
       </header>
 
-      <div className="screen exercises" data-stage={stage}>
+      <div className="screen exercises" data-stage={stage} data-centered={centered ? '1' : '0'}>
         {stage === 'home' && (
           <div className="ex-home">
             {!docsLoaded && <div className="loading">Carregando…</div>}

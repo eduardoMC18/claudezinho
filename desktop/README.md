@@ -132,6 +132,20 @@ Origem: `docs/design-dna/` (GlassCN, Apple Liquid Glass, GlassyUI e a página `g
 
 **Limites:** a diferença do modo Tingido é sutil onde o fundo já é quase branco (o teste mede +4 de 255 na barra lateral); a qualidade **detectada** nesta máquina é "alta", então as faixas de detecção (memória ≤ 4 GB, toque) só foram verificadas pela lógica, não em outro aparelho; não medi o ganho de desempenho de cada nível (só a resolução e os recursos desligados).
 
+## Fundo Liquid Glass e estados vazios centralizados (20/11/2026)
+
+**Origem do fundo antigo:** o shader `FS_BG` (GLSL) em `src/renderer/glass/shaders.ts`, desenhado a cada quadro pelo motor WebGL num canvas de tela cheia (`#glass-canvas`). Pintava 6 feixes de 3 fibras, 5 fios no topo, faixas coloridas, uma **grade de 96 px** e um tubo branco, pensados para dar o que refratar às lentes. Não era CSS nem SVG, então foi **substituído na fonte** (nada foi coberto ou apagado com opacidade).
+
+**Fundo novo:** off-white frio (≈ #F1F1F3) com variações de luminosidade muito suaves (poça de luz ampla no topo esquerdo, sombra fria embaixo à direita, um destaque pequeno e difuso, leve gradiente vertical e dithering contra faixas). Amplitude de ~13 níveis de 255, sem linhas, grade, ondas nem cor saturada; deriva lenta que some com "reduzir movimento".
+
+**Material ajustado para não virar cartão branco:** película com 9% de véu (antes 24%) e brilho ×1,012 (antes ×1,03); aresta interna mais densa dá espessura; filete escuro no lado sem luz e rim claro no lado da luz (mais discreto na película e no botão grafite); sombra de camada única (longa, suave, espalhamento negativo, 6%) fora de qualidade baixa. As superfícies continuam refratando o ambiente, **mas sobre um fundo liso a refração fica quase invisível por escolha**: o caráter das lentes vem da aresta, do especular e da dispersão.
+
+**Centralização:** `.screen` é um grid com `align-content: start` e `.exercises` tinha `max-width: 920px` alinhado à esquerda, então o cartão só se centrava dentro dessa coluna e ficava 8vh abaixo do topo. Agora os estados de painel único (sem PDFs, gerando, erro) marcam `data-centered="1"` e `.screen[data-centered]` usa Grid (`align-content: center; justify-items: center`, sem `max-width` nem padding assimétrico) sobre a **área útil**: a coluna principal abaixo do cabeçalho. A barra lateral não entra na conta porque está na outra coluna; recolher/expandir muda a coluna e o cartão acompanha. Sem coordenadas absolutas nem margens fixas.
+
+**Verificado** (83 checks, 0 falhas): cartão a **0,00 px** do centro da área útil com a barra expandida e recolhida, e em 1440×900, 1280×800, 1100×720 e 980×600 (desvio máximo de 0,01 px durante a animação da barra); a área útil não inclui a barra; o cartão tem 560×193 px (compacto), o título fica no topo e o botão visível; os painéis "Gerando…" e de erro também centralizam; fundo lido da GPU: 394 pontos com amplitude de 6,2 níveis, maior salto entre pontos vizinhos 1,0 e croma máximo 5 (de 255), ou seja, sem linhas, grade nem cor saturada; película da barra em 250 (antes 254, branco chapado) e Tingido ainda perceptível (250,3 → 252,4). Leitor, Chat, Histórico, Configurações e Exercícios usam o mesmo fundo (canvas global).
+
+**Limites:** o app **JavaFX** (`frontend/`) tem o mesmo tipo de fundo (`AmbientBackground` + `FlowField`) e **não foi alterado**; a referência visual citada no pedido não chegou como imagem, então segui a descrição; o contraste do texto sobre as películas não foi medido de novo com o novo material.
+
 ## Comandos (PowerShell)
 
 ```powershell
