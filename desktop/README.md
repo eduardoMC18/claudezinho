@@ -98,6 +98,18 @@ cd desktop
 - Uma pasta `release/` antiga ficou bloqueada por um processo que não consegui identificar (por isso a saída ficou em `installer/`); ambas estão no `.gitignore`.
 - Tauri **não foi medido**; a escolha do Electron segue provisória.
 
+## Barra lateral recolhível e layout responsivo
+
+- **Dois estados** (`ui/Sidebar.tsx`, `ui/useSidebar.ts`): expandida (232 px, ícones + nomes, marca, aviso de privacidade) e recolhida (**68 px**, só ícones centralizados, item ativo em lente 44×44, dicas ao passar o mouse ou focar com o teclado). Botão discreto no topo (ícone de painel que gira 180°), com `aria-expanded`.
+- **Animação:** a largura anima na própria coluna do grid (`.app`, `--sidebar-w`, 0,32 s, `cubic-bezier(.32,.72,0,1)`), então o conteúdo acompanha quadro a quadro, sem sobreposição. Os textos se recolhem em largura e somem antes; os ícones ficam a 13 px da borda nos **dois** estados (sem salto). O motor de vidro recebe `kick()` para redesenhar durante a transição. `prefers-reduced-motion` desliga a animação.
+- **Persistência:** `localStorage` (`estudotron.sidebar` = `collapsed`/`expanded`) da interface `app://local`, que o Electron guarda na pasta de dados do usuário e mantém entre reinícios. Só grava quando o usuário escolhe; sem escolha, recolhe sozinha abaixo de 1280 px de janela. Leitura e gravação protegidas (sem armazenamento, a barra segue a largura da janela).
+- **Layout:** espaçamentos 14 → 12 px; chat encaixado com ~28% da área (340–460 px); os PDFs ficam com o resto, sempre lado a lado e equilibrados. Abaixo de 1040 px de área do Leitor, o chat vira **painel sobreposto** (aberto pelo botão "Chat", com botão de fechar; fecha sozinho ao clicar numa citação para mostrar a página). No painel sobreposto (opaco, por legibilidade) os controles usam o material sólido em CSS, porque o vidro da GPU fica atrás do DOM. Largura mínima da janela: 980 px (era 1140).
+- **Autoteste:** usa uma pasta de dados isolada (nunca grava a sua preferência). `ESTUDO_USERDATA=<pasta>` reaproveita a mesma pasta entre execuções, o que prova a persistência: a 1ª execução termina recolhida e a 2ª abre recolhida. Também desliga a redução de quadros de janelas encobertas, para as medições não dependerem do que está na tela.
+
+**Verificado:** 69 checks, 0 falhas (os 56 anteriores sem regressão). Expandida com 232 px e textos visíveis. Recolher de 232 a 68 px em 14 quadros intermediários, largura monotônica, sem sobreposição nem rolagem horizontal. Ícones centralizados (±1,5 px). Dicas corretas e não cortadas para os 3 itens e o botão. Conteúdo +164 px; PDFs 403 → 468 px cada, equilibrados; chat 340 → 374 px. Zoom dos PDFs reajustado (40% → 48%). Preferência gravada. Estado igual em Leitor, Configurações e Exercícios. Expandir e recolher de novo sem resíduos. Janelas 1440×900 e 1280×800 com chat encaixado; 1100×720 e 980×600 com chat sobreposto (abre, fecha, botões visíveis). Reinício: abre recolhida. pytest 104/104 e `mvn test` verdes.
+
+**Não verificado:** arrastar o divisor com o mouse depois da mudança, e uso com o mouse/teclado de verdade (os testes disparam eventos). Telas com DPI alto (125%/150%) e monitores ultralargos não foram testados.
+
 ## Comandos (PowerShell)
 
 ```powershell

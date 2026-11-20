@@ -12,21 +12,53 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .btn.primary { color: #fff; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.app { position: relative; z-index: 1; height: 100%; padding: 14px; display: grid; grid-template-columns: var(--sidebar-w) 1fr; gap: 14px; }
+/* A largura da barra anima no próprio grid: o conteúdo principal acompanha quadro a quadro, sem sobreposição. */
+.app { position: relative; z-index: 1; height: 100%; padding: 12px; display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); gap: 12px;
+  transition: grid-template-columns var(--sidebar-anim) var(--ease); }
+.app[data-sidebar="collapsed"] { --sidebar-w: var(--sidebar-w-collapsed); }
 
 /* ---- barra lateral ---- */
-.sidebar { padding: 20px 14px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
-.brand { font-weight: 700; letter-spacing: -.3px; font-size: 17px; padding: 2px 10px 18px; }
+/* Largura interna recolhida = 68 − 2×12 = 44 px. Os ícones ficam a 13 px da borda nos DOIS estados (centro em 22 px),
+   então só os textos se recolhem: nada salta quando a barra muda de estado. */
+/* width: 100% = exatamente a coluna do grid; sem isso o conteúdo (nome + botão) empurrava a barra além da coluna
+   e a impedia de encolher durante a animação. */
+.sidebar { position: relative; z-index: 5; width: 100%; padding: 16px 12px 14px; display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+.brand-row { display: flex; align-items: center; min-width: 0; margin-bottom: 14px; }
+.brand { flex: 1 1 0; min-width: 0; overflow: hidden; padding-left: 10px; font-weight: 700; letter-spacing: -.3px; font-size: 16px; transition: padding var(--sidebar-anim) var(--ease); }
+.brand .label { display: block; margin-left: 0; }
 .brand small { display: block; font-weight: 500; font-size: var(--fs-small); color: var(--ink-2); letter-spacing: 0; }
-.nav { width: 100%; height: 44px; justify-content: flex-start; padding: 0 14px; }
-.nav-plain { width: 100%; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 0; background: transparent; color: var(--ink-2); font-weight: 500; text-align: left; cursor: pointer; border-radius: 22px; }
+.collapse-btn { flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--ink-3); cursor: pointer;
+  transition: background .15s, color .15s, width var(--sidebar-anim) var(--ease); }
+.sidebar[data-collapsed="1"] .collapse-btn { width: 44px; } /* ocupa a largura interna toda: fica centralizado */
+.collapse-btn:hover, .collapse-btn:focus-visible { background: rgba(255, 255, 255, .45); color: var(--ink); }
+.collapse-btn svg { transition: transform var(--sidebar-anim) var(--ease); }
+.nav, .nav-plain { width: 100%; height: 44px; justify-content: flex-start; gap: 0; padding: 0 0 0 13px; }
+.nav-plain { display: flex; align-items: center; border: 0; background: transparent; color: var(--ink-2); font-weight: 500; text-align: left; cursor: pointer; border-radius: 22px; }
 .nav-plain:hover { color: var(--ink); background: rgba(255, 255, 255, .35); }
+.sidebar .label { display: inline-block; margin-left: 10px; max-width: 180px; overflow: hidden; white-space: nowrap; opacity: 1;
+  transition: max-width var(--sidebar-anim) var(--ease), margin var(--sidebar-anim) var(--ease), opacity .2s ease .1s; }
 .sidebar .spacer { flex: 1; }
-.sidebar .foot { font-size: 11px; color: var(--ink-2); padding: 8px 10px 0; }
+.sidebar .foot { overflow: hidden; max-height: 64px; padding: 8px 0 0 10px; font-size: 11px; color: var(--ink-2); opacity: 1;
+  transition: max-height var(--sidebar-anim) var(--ease), padding var(--sidebar-anim) var(--ease), opacity .2s ease .1s; }
+.sidebar .foot-text { display: block; width: 190px; } /* largura fixa: o texto não se reorganiza enquanto a barra encolhe */
+
+/* recolhida: textos somem primeiro (rápido) enquanto a largura encolhe */
+.sidebar[data-collapsed="1"] .label { max-width: 0; margin-left: 0; opacity: 0; transition: max-width var(--sidebar-anim) var(--ease), margin var(--sidebar-anim) var(--ease), opacity .1s ease; }
+.sidebar[data-collapsed="1"] .brand { flex-grow: 0; padding-left: 0; }
+.sidebar[data-collapsed="1"] .foot { max-height: 0; padding: 0; opacity: 0; transition: max-height var(--sidebar-anim) var(--ease), padding var(--sidebar-anim) var(--ease), opacity .1s ease; }
+.sidebar[data-collapsed="1"] .collapse-btn svg { transform: rotate(180deg); }
+
+/* dica ao lado do ícone (barra recolhida) */
+.tipwrap { position: relative; display: block; }
+.brand-row .tipwrap { flex: none; }
+.tip { position: absolute; left: calc(100% + 14px); top: 50%; transform: translateY(-50%); z-index: 40; white-space: nowrap; pointer-events: none;
+  padding: 6px 12px; border-radius: 12px; font-size: 12.5px; font-weight: 500; color: var(--ink); background: rgba(255, 255, 255, .96);
+  box-shadow: 0 0 0 1px var(--line), 0 10px 24px -14px rgba(0, 0, 0, .3); animation: tip-in .14s ease-out; }
+@keyframes tip-in { from { opacity: 0; transform: translate(-4px, -50%); } }
 .icon { width: 18px; height: 18px; flex: none; }
 
 /* ---- conteúdo ---- */
-.main { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-width: 0; min-height: 0; }
+.main { display: grid; grid-template-rows: auto 1fr; gap: 12px; min-width: 0; min-height: 0; }
 .head { display: flex; align-items: center; gap: 10px; padding: 0 4px; min-height: 42px; }
 .head h1 { margin: 0 auto 0 4px; font-size: var(--fs-title); letter-spacing: -.3px; }
 .screen { min-height: 0; overflow: auto; padding: 2px 4px 14px 2px; display: grid; gap: 14px; align-content: start; scrollbar-width: thin; scrollbar-color: rgba(60, 62, 70, .35) transparent; }
@@ -62,9 +94,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 
 /* ---- Leitor de PDFs ---- */
 .main > .head + .reader { min-height: 0; }
-.reader { display: flex; gap: 14px; min-height: 0; min-width: 0; padding: 0 2px 2px 0; }
+.reader { position: relative; display: flex; gap: 12px; min-height: 0; min-width: 0; padding: 0 2px 2px 0; }
 .pdfs { flex: 1; display: grid; min-height: 0; min-width: 0; }
-.chat { flex: none; width: clamp(320px, 30%, 460px); display: flex; flex-direction: column; min-height: 0; padding: 16px; gap: 10px; position: relative; }
+/* Chat encaixado: ~28% da área, entre 340 e 460 px (leitura confortável sem roubar os PDFs). */
+.chat { flex: none; width: clamp(340px, 28%, 460px); display: flex; flex-direction: column; min-height: 0; padding: 14px; gap: 10px; position: relative; }
+/* Área estreita: o chat vira painel sobreposto (aberto pelo botão "Chat"); os PDFs ficam com a largura toda.
+   Fundo quase opaco: sobre as páginas, o texto do chat precisa de contraste. */
+.chat.overlay { position: absolute; top: 0; right: 2px; bottom: 2px; z-index: 10; width: min(420px, calc(100% - 24px));
+  background: rgba(250, 250, 252, .97); border-radius: 30px; box-shadow: 0 0 0 1px var(--line), 0 18px 44px -24px rgba(0, 0, 0, .35);
+  animation: chat-in .22s var(--ease); }
+@keyframes chat-in { from { opacity: 0; transform: translateX(16px); } }
+/* O vidro da GPU fica ATRÁS do DOM: o fundo opaco do painel sobreposto o esconderia. Dentro dele, os controles
+   usam o material sólido em CSS (o mesmo do modo de reserva), para continuarem visíveis e legíveis. */
+.chat.overlay [data-glass] { background: rgba(255, 255, 255, .9); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1); }
+.chat.overlay [data-glass="primary"] { background: #2a2b2f; color: #fff; box-shadow: none; }
+.chat.overlay .msgfield, .chat.overlay .sel { background: #fff; }
+.chat.overlay .btn.sm { border-radius: 17px; }
+.chat.overlay .msgfield { border-radius: 23px; }
+.chat.overlay .send { border-radius: 23px; }
+.chat.overlay .sel { border-radius: 16px; }
+.chat-close { margin-left: 2px; }
 .chat-head { display: flex; align-items: center; gap: 6px; }
 .chat-head h2 { margin: 0 auto 0 6px; font-size: 15px; letter-spacing: -.2px; white-space: nowrap; }
 .chat-head .btn.sm { padding: 0 13px; white-space: nowrap; }
@@ -235,4 +284,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .ex-refs { margin-top: 2px; }
 .ex-end { margin-top: 4px; }
 
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+  .app, .sidebar, .sidebar *, .tip { transition: none !important; animation: none !important; }
+}

@@ -7,12 +7,17 @@ import { Reader } from './screens/Reader';
 import type { CiteTarget } from './screens/ChatPanel';
 import { Settings } from './screens/Settings';
 import { Sidebar, type ScreenId } from './ui/Sidebar';
+import { useSidebar } from './ui/useSidebar';
 import { runSelfTest } from './selftest';
 
 export function App() {
   const [screen, setScreen] = useState<ScreenId>('reader');
   const [pending, setPending] = useState<CiteTarget | null>(null);
   const chat = useChat(); // fora das telas: uma resposta em andamento continua ao trocar de tela
+  const sidebar = useSidebar();
+
+  // a largura da barra anima em CSS; o vidro precisa redesenhar a cada quadro enquanto isso
+  useEffect(() => { window.__glass?.engine?.kick(450); }, [sidebar.collapsed]);
 
   useEffect(() => {
     void window.estudo.info().then((info) => { if (info.selfTest) void runSelfTest(); });
@@ -26,8 +31,8 @@ export function App() {
 
   return (
     <GlassProvider>
-      <div className="app">
-        <Sidebar screen={screen} onSelect={setScreen} />
+      <div className="app" data-sidebar={sidebar.collapsed ? 'collapsed' : 'expanded'}>
+        <Sidebar screen={screen} onSelect={setScreen} collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
         <div className="main">
           {screen === 'reader' && <Reader chat={chat} pending={pending} onPendingDone={() => setPending(null)} />}
           {screen === 'exercises' && (

@@ -17,6 +17,9 @@ interface Props {
   /** Aviso vindo da tela (ex.: documento substituído desde a resposta). */
   warning: string | null;
   onCite(t: CiteTarget): void;
+  /** true = painel sobreposto (área estreita), com botão de fechar. */
+  overlay?: boolean;
+  onClose?(): void;
 }
 
 const MAX_LINES = 5;
@@ -45,7 +48,7 @@ function Footer({ m, providerName }: { m: ChatMsg; providerName: string }) {
   );
 }
 
-export function ChatPanel({ chat, hasDocs, warning, onCite }: Props) {
+export function ChatPanel({ chat, hasDocs, warning, onCite, overlay = false, onClose }: Props) {
   const { messages, streaming, notice, settings, selection } = chat;
   const [text, setText] = useState('');
   const [showHistory, setShowHistory] = useState(false);
@@ -105,13 +108,16 @@ export function ChatPanel({ chat, hasDocs, warning, onCite }: Props) {
   const cur = settings?.providers.find((p) => p.id === selection?.provider);
 
   return (
-    <GlassPanel as="aside" className="chat" radius={30} bevel={20} aria-label="Chat com a IA">
+    <GlassPanel as="aside" className={'chat' + (overlay ? ' overlay' : '')} radius={30} bevel={20} aria-label="Chat com a IA" data-mode={overlay ? 'overlay' : 'docked'}>
       <div className="chat-head">
         <h2>Chat com a IA</h2>
         <GlassButton className="sm" variant="film" radius={17} bevel={12} data-action="history" aria-expanded={showHistory}
           onClick={() => { setShowHistory((v) => !v); void chat.refreshHistory(); }}>Histórico</GlassButton>
         <GlassButton className="sm" variant="film" radius={17} bevel={12} data-action="new-chat" disabled={streaming}
           title="Nova conversa (a atual continua salva no histórico)" onClick={() => { setShowHistory(false); void chat.newConversation(); }}>Nova</GlassButton>
+        {overlay && onClose && (
+          <GlassButton className="sm sq chat-close" variant="film" radius={17} bevel={12} data-action="close-chat" aria-label="Fechar o chat" onClick={onClose}>×</GlassButton>
+        )}
       </div>
 
       {settings && selection && (
@@ -199,7 +205,8 @@ export function ChatPanel({ chat, hasDocs, warning, onCite }: Props) {
             ref={taRef}
             rows={1}
             value={text}
-            placeholder={hasDocs ? 'Pergunte sobre os PDFs… (Enter envia, Shift+Enter quebra linha)' : 'Carregue um PDF para começar'}
+            placeholder={hasDocs ? 'Pergunte sobre os PDFs…' : 'Carregue um PDF para começar'}
+            title="Enter envia · Shift+Enter quebra linha"
             aria-label="Pergunta"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}

@@ -15,6 +15,7 @@ interface EstudoBridge {
   reportSelfTest(result: unknown): void;
   /** Só no autoteste com --shots=<pasta>: salva uma captura da janela. Retorna o caminho ou null. */
   capture(name: string): Promise<string | null>;
+  resize(w: number, h: number): Promise<[number, number] | null>;
   pickPdf(): Promise<string | null>;
   pathForFile(file: File): string;
 }

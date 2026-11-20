@@ -535,6 +535,193 @@ async function smokeReader(info: Awaited<ReturnType<EstudoBridge['info']>>, chec
   });
 }
 
+// ---------- Barra lateral recolhível e layout responsivo ----------
+
+const sb = () => document.querySelector<HTMLElement>('.sidebar')!;
+const sbToggle = () => document.querySelector<HTMLElement>('[data-action="toggle-sidebar"]')!;
+const isCollapsed = () => sb().getAttribute('data-collapsed') === '1';
+const W = (el: Element | null) => (el ? el.getBoundingClientRect().width : 0);
+const noHScroll = () => document.documentElement.scrollWidth <= window.innerWidth + 1;
+const navItems = () => [...document.querySelectorAll<HTMLElement>('.sidebar [data-nav]')];
+const savedPref = () => { try { return localStorage.getItem('estudotron.sidebar'); } catch { return 'indisponível'; } };
+
+/** Clica no botão e amostra o layout durante a transição (largura da barra, borda do conteúdo, rolagem horizontal). */
+async function toggleAndSample(): Promise<{ widths: number[]; overlap: boolean; hscroll: boolean }> {
+  const widths: number[] = [];
+  let overlap = false, hscroll = false;
+  sbToggle().click();
+  const t0 = performance.now();
+  while (performance.now() - t0 < 650) {
+    const s = sb().getBoundingClientRect(), m = document.querySelector('.main')!.getBoundingClientRect();
+    widths.push(Math.round(s.width * 10) / 10);
+    if (m.left < s.right - 0.5) overlap = true;
+    if (!noHScroll()) hscroll = true;
+    await sleep(12);
+  }
+  return { widths, overlap, hscroll };
+}
+
+async function layoutScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  await window.estudo.resize(1440, 900); // garante janela restaurada e no tamanho de referência
+  nav('reader');
+  await waitFor(() => document.querySelector('.reader[data-loaded="1"]'), 8000);
+  if (isCollapsed()) { sbToggle().click(); await sleep(500); }
+
+  await check('Barra expandida: textos visíveis e botão discreto de recolher', async () => {
+    const w = W(sb());
+    if (Math.abs(w - 232) > 2) throw new Error(`largura ${w}`);
+    const labels = [...sb().querySelectorAll<HTMLElement>('.label')];
+    if (labels.some((l) => getComputedStyle(l).opacity !== '1' || W(l) < 30)) throw new Error('algum texto não está visível');
+    if (sbToggle().getAttribute('aria-expanded') !== 'true') throw new Error('aria-expanded errado');
+    return `${Math.round(w)} px, ${labels.length} textos visíveis`;
+  });
+  await window.estudo.capture('12-sidebar-expandida');
+  const before = { main: W(document.querySelector('.main')), a: W(pane('A')), b: W(pane('B')), chat: W(document.querySelector('.chat')), pctA: pct('A') };
+
+  await check('Recolher: largura anima de forma contínua, sem sobreposição nem rolagem horizontal', async () => {
+    const r = await toggleAndSample();
+    const ws = r.widths;
+    for (let i = 1; i < ws.length; i++) if (ws[i] > ws[i - 1] + 0.6) throw new Error(`largura voltou a crescer: ${ws[i - 1]} → ${ws[i]}`);
+    const steps = new Set(ws.filter((w) => w < 231 && w > 69)).size;
+    if (steps < 5) throw new Error(`poucos quadros intermediários (${steps}): a transição não foi suave`);
+    if (r.overlap) throw new Error('o conteúdo sobrepôs a barra durante a animação');
+    if (r.hscroll) throw new Error('apareceu rolagem horizontal durante a animação');
+    const end = W(sb());
+    if (Math.abs(end - 68) > 1.5) throw new Error(`largura final ${end}`);
+    return `232 → ${Math.round(end)} px em ${steps} quadros intermediários, sem sobreposição`;
+  });
+  await sleep(300);
+
+  await check('Recolhida: só ícones, centralizados; item selecionado continua destacado', async () => {
+    if (!isCollapsed()) throw new Error('não recolheu');
+    const sbr = sb().getBoundingClientRect(), center = sbr.left + sbr.width / 2;
+    for (const it of navItems()) {
+      const ic = it.querySelector('svg')!.getBoundingClientRect();
+      if (Math.abs(ic.left + ic.width / 2 - center) > 1.5) throw new Error(`ícone de ${it.dataset.nav} fora do centro`);
+      const lab = it.querySelector<HTMLElement>('.label')!;
+      if (getComputedStyle(lab).opacity !== '0' || W(lab) > 0.5) throw new Error('texto ainda visível');
+    }
+    const active = document.querySelector<HTMLElement>('.sidebar [aria-current="page"]')!;
+    if (active.dataset.glass !== 'lens' || Math.abs(W(active) - 44) > 1) throw new Error('item ativo sem destaque de vidro');
+    if (W(sb().querySelector('.foot')) > 0 && sb().querySelector<HTMLElement>('.foot')!.getBoundingClientRect().height > 0.5) throw new Error('rodapé visível');
+    return `${navItems().length} ícones centralizados; ativo: ${active.dataset.nav} (lente 44×44)`;
+  });
+  await window.estudo.capture('13-sidebar-recolhida');
+
+  await check('Dicas (tooltips) ao passar o mouse sobre cada ícone e sobre o botão', async () => {
+    const seen: string[] = [];
+    for (const el of [...navItems(), sbToggle()]) {
+      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      const tip = await waitFor(() => document.querySelector<HTMLElement>('[role="tooltip"]'), 1000);
+      if (!tip) throw new Error(`sem dica para ${el.getAttribute('aria-label')}`);
+      if (tip.textContent !== el.getAttribute('aria-label')) throw new Error(`dica “${tip.textContent}” ≠ “${el.getAttribute('aria-label')}”`);
+      const tr = tip.getBoundingClientRect();
+      if (tr.left < sb().getBoundingClientRect().right || tr.right > window.innerWidth) throw new Error('dica fora do lugar ou cortada');
+      seen.push(tip.textContent!);
+      el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+      if (!(await waitFor(() => !document.querySelector('[role="tooltip"]'), 1000))) throw new Error('a dica não sumiu');
+    }
+    return seen.join(' · ');
+  });
+
+  await check('O espaço liberado vai para o conteúdo; PDFs equilibrados e chat confortável', async () => {
+    await sleep(200);
+    const now = { main: W(document.querySelector('.main')), a: W(pane('A')), b: W(pane('B')), chat: W(document.querySelector('.chat')) };
+    const gain = now.main - before.main;
+    if (Math.abs(gain - 164) > 4) throw new Error(`conteúdo ganhou ${gain.toFixed(1)} px (esperado ≈164)`);
+    if (now.a - before.a < 40 || now.b - before.b < 40) throw new Error('os PDFs não aproveitaram o espaço');
+    if (Math.abs(now.a - now.b) > now.a * 0.03) throw new Error(`PDFs desequilibrados (${Math.round(now.a)} × ${Math.round(now.b)})`);
+    if (now.chat < 340 || now.chat > 460) throw new Error(`chat com ${Math.round(now.chat)} px`);
+    return `conteúdo +${Math.round(gain)} px; PDFs ${Math.round(before.a)}→${Math.round(now.a)} e ${Math.round(before.b)}→${Math.round(now.b)} px; chat ${Math.round(before.chat)}→${Math.round(now.chat)} px`;
+  });
+  await check('Os PDFs reajustam o zoom à nova largura (página mais larga cabe)', async () => {
+    const ok = await waitFor(() => pct('A') !== before.pctA && pane('A').querySelector('.zoom')!.getAttribute('data-fit') === '1', 3000);
+    if (!ok) throw new Error(`zoom não mudou (${before.pctA}% → ${pct('A')}%)`);
+    const sc = pane('A').querySelector<HTMLElement>('.pdf-scroller')!;
+    const widest = Math.max(...[...pane('A').querySelectorAll<HTMLElement>('.pdf-page')].map((e) => e.offsetWidth));
+    if (widest > sc.clientWidth) throw new Error('página cortada');
+    return `${before.pctA}% → ${pct('A')}%`;
+  });
+  await check('Preferência gravada localmente', async () => {
+    if (savedPref() !== 'collapsed') throw new Error(`localStorage = ${savedPref()}`);
+    return 'estudotron.sidebar = collapsed';
+  });
+  await check('Vale para todas as telas (Configurações e Exercícios)', async () => {
+    const out: string[] = [];
+    for (const id of ['settings', 'exercises', 'reader']) {
+      nav(id);
+      await sleep(350);
+      if (!isCollapsed() || Math.abs(W(sb()) - 68) > 1.5) throw new Error(`barra mudou na tela ${id}`);
+      const m = document.querySelector('.main')!.getBoundingClientRect();
+      if (m.left > 68 + 12 + 12 + 2) throw new Error(`conteúdo de ${id} não ocupou o espaço (left ${m.left})`);
+      out.push(id);
+    }
+    await waitFor(() => document.querySelector('.reader[data-loaded="1"]'), 8000);
+    return out.join(', ') + ': barra recolhida, conteúdo encostado';
+  });
+  await check('Expandir de novo (sem resíduos) e recolher outra vez', async () => {
+    const r = await toggleAndSample();
+    for (let i = 1; i < r.widths.length; i++) if (r.widths[i] < r.widths[i - 1] - 0.6) throw new Error('largura diminuiu ao expandir');
+    if (r.overlap || r.hscroll) throw new Error('sobreposição ou rolagem horizontal ao expandir');
+    if (Math.abs(W(sb()) - 232) > 2 || savedPref() !== 'expanded') throw new Error(`expandida: ${W(sb())} px, preferência ${savedPref()}`);
+    if ([...sb().querySelectorAll<HTMLElement>('.nav .label, .nav-plain .label')].some((l) => getComputedStyle(l).opacity !== '1')) throw new Error('textos não voltaram');
+    await toggleAndSample(); // deixa recolhida: a próxima execução prova que o estado volta após reiniciar
+    if (!isCollapsed() || savedPref() !== 'collapsed') throw new Error('não recolheu de novo');
+    return 'expandiu (232 px, textos de volta) e recolheu (68 px)';
+  });
+
+  // ---- resoluções ----
+  const sizes: Array<[number, number]> = [[1440, 900], [1280, 800], [1100, 720], [980, 600]];
+  for (const [w, h] of sizes) {
+    await check(`Janela ${w}×${h}: nada cortado, PDFs lado a lado, chat acessível`, async () => {
+      const got = await window.estudo.resize(w, h);
+      await sleep(500);
+      if (!noHScroll()) throw new Error('rolagem horizontal');
+      const r = document.querySelector<HTMLElement>('.reader')!;
+      const layout = r.dataset.layout;
+      const a = pane('A').getBoundingClientRect(), b = pane('B').getBoundingClientRect();
+      if (a.width < 280 || b.width < 280) throw new Error(`PDFs estreitos demais (${Math.round(a.width)} / ${Math.round(b.width)})`);
+      if (b.right > window.innerWidth + 0.5 || !(a.right <= b.left)) throw new Error('PDFs fora da tela ou sobrepostos');
+      const btn = document.querySelector<HTMLElement>('[data-action="toggle-chat"]')!.getBoundingClientRect();
+      if (btn.right > window.innerWidth) throw new Error('botão Chat cortado');
+      const tools = pane('A').querySelector<HTMLElement>('.tools')!.getBoundingClientRect();
+      if (tools.right > a.right + 0.5) throw new Error('controles do PDF cortados');
+      let chatInfo = '';
+      if (layout === 'narrow') {
+        if (!document.querySelector('.chat')) document.querySelector<HTMLElement>('[data-action="toggle-chat"]')!.click();
+        const c = await waitFor(() => document.querySelector<HTMLElement>('.chat'), 2000);
+        if (!c || c.dataset.mode !== 'overlay') throw new Error('o chat não abriu como painel sobreposto');
+        await sleep(320); // fim da animação de entrada
+        const cr = c.getBoundingClientRect();
+        if (cr.right > window.innerWidth + 0.5 || cr.width < 300) throw new Error('painel do chat cortado');
+        if (getComputedStyle(c).opacity !== '1') throw new Error('painel ainda transparente');
+        // o vidro da GPU fica atrás do DOM: dentro do painel opaco os botões precisam do material em CSS
+        const send = c.querySelector<HTMLElement>('[data-action="send"], [data-action="stop"]')!;
+        const sr = send.getBoundingClientRect();
+        if (sr.right > cr.right + 0.5 || sr.width < 30) throw new Error('botão de enviar fora do painel');
+        const bg = getComputedStyle(send).backgroundColor;
+        if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') throw new Error('botão de enviar invisível sobre o painel opaco');
+        for (const a of ['history', 'new-chat', 'close-chat']) {
+          const b = getComputedStyle(c.querySelector<HTMLElement>(`[data-action="${a}"]`)!).backgroundColor;
+          if (b === 'rgba(0, 0, 0, 0)') throw new Error(`botão ${a} sem fundo visível`);
+        }
+        await window.estudo.capture(`14-${w}x${h}-chat-sobreposto`);
+        document.querySelector<HTMLElement>('[data-action="close-chat"]')!.click();
+        if (!(await waitFor(() => !document.querySelector('.chat'), 2000))) throw new Error('não fechou');
+        chatInfo = `chat sobreposto (${Math.round(cr.width)} px), abre e fecha`;
+      } else {
+        const c = document.querySelector<HTMLElement>('.chat');
+        chatInfo = c ? `chat encaixado (${Math.round(W(c))} px)` : 'chat oculto';
+      }
+      await sleep(250);
+      await window.estudo.capture(`14-${w}x${h}`);
+      return `área ${got?.join('×')}; ${layout}; PDFs ${Math.round(a.width)} + ${Math.round(b.width)} px; ${chatInfo}`;
+    });
+  }
+  await window.estudo.resize(1440, 900);
+  void info;
+}
+
 let TEST_PDFS: Record<string, string> = {};
 const pdfs0 = () => TEST_PDFS;
 
@@ -701,6 +888,17 @@ export async function runSelfTest(): Promise<void> {
   const info = await window.estudo.info();
   const nav = (id: string) => document.querySelector<HTMLElement>(`[data-nav="${id}"]`)!.click();
 
+  // primeiro de tudo: o estado da barra lateral ao abrir (prova da persistência entre reinícios)
+  await check('Barra lateral ao iniciar', async () => {
+    const el = await waitFor(() => document.querySelector('.sidebar'), 5000);
+    if (!el) throw new Error('barra lateral ausente');
+    const app = document.querySelector<HTMLElement>('.app')!;
+    const kids = [...el.querySelectorAll<HTMLElement>('*')].map((k) => [k.className && typeof k.className === 'string' ? k.className : k.tagName, Math.round(k.getBoundingClientRect().width)] as const)
+      .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, w]) => `${n}:${w}`).join(', ');
+    const dbg = `cols=${getComputedStyle(app).gridTemplateColumns}; sb=${W(el).toFixed(1)}/${(el as HTMLElement).offsetWidth}; maiores=${kids}`;
+    return `${el.getAttribute('data-collapsed') === '1' ? 'collapsed' : 'expanded'}; preferência salva: ${savedPref() ?? 'nenhuma'} | ${dbg}`;
+  });
+
   // ---- casca (Etapa 1) ----
   await check('Contexto isolado (sem Node na página)', async () => {
     const g = globalThis as unknown as Record<string, unknown>;
@@ -826,6 +1024,7 @@ export async function runSelfTest(): Promise<void> {
     await readerScenario(info, check, results);
     await chatScenario(info, check);
     await exercisesScenario(info, check);
+    await layoutScenario(info, check);
   }
 
   window.estudo.reportSelfTest({ ok: results.every((r) => r.ok), checks: results });

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('estudo', {
   }> => ipcRenderer.invoke('app:info'),
   reportSelfTest: (result: unknown): void => ipcRenderer.send('selftest:result', result),
   capture: (name: string): Promise<string | null> => ipcRenderer.invoke('selftest:capture', name),
+  /** Só no autoteste: redimensiona a área útil da janela. */
+  resize: (w: number, h: number): Promise<[number, number] | null> => ipcRenderer.invoke('selftest:resize', w, h),
   /** Abre o seletor de arquivos do sistema (somente PDF). Retorna o caminho ou null se cancelado. */
   pickPdf: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickPdf'),
   /** Caminho no disco de um arquivo arrastado para a janela. */

@@ -7,16 +7,30 @@ import { ViewerPane, type ViewerPaneHandle } from './ViewerPane';
 
 type Slots = Record<SlotId, DocumentInfo | null>;
 const EMPTY: Slots = { A: null, B: null };
+/** Abaixo desta largura da área do Leitor, o chat deixa de ficar encaixado e vira painel sobreposto. */
+const NARROW_W = 1040;
 
 /** Leitor de PDFs: dois visualizadores independentes lado a lado, divisor ajustável, chat à direita. */
 export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pending: CiteTarget | null; onPendingDone(): void }) {
   const [slots, setSlots] = useState<Slots>(EMPTY);
   const [errors, setErrors] = useState<Record<SlotId, string | null>>({ A: null, B: null });
   const [ratio, setRatio] = useState(0.5);
-  const [showChat, setShowChat] = useState(true);
+  // null = automático (encaixado e aberto em área larga; fechado em área estreita); true/false = escolha do usuário
+  const [chatPref, setChatPref] = useState<boolean | null>(null);
+  const [narrow, setNarrow] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const readerRef = useRef<HTMLDivElement>(null);
   const pdfs = useRef<HTMLDivElement>(null);
+  const showChat = chatPref ?? !narrow;
+
+  useEffect(() => {
+    const el = readerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < NARROW_W));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const paneA = useRef<ViewerPaneHandle>(null);
   const paneB = useRef<ViewerPaneHandle>(null);
 
@@ -89,7 +103,8 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
     }
     setWarning(null);
     (t.slot === 'A' ? paneA : paneB).current?.goToPage(t.page);
-  }, [slots]);
+    if (narrow) setChatPref(false); // painel sobreposto: fecha para mostrar a página citada
+  }, [slots, narrow]);
 
   // referência clicada em outra tela (ex.: Exercícios): assim que a sessão carrega, leva o PDF à página
   useEffect(() => {
@@ -121,9 +136,9 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
         <GlassButton className="btn" variant="lens" radius={21} bevel={18} data-load="A" onClick={() => void pick('A')}>Carregar PDF 1</GlassButton>
         <GlassButton className="btn" variant="lens" radius={21} bevel={18} data-load="B" onClick={() => void pick('B')}>Carregar PDF 2</GlassButton>
         <GlassButton className="btn" variant={showChat ? 'primary' : 'lens'} radius={21} bevel={18} data-action="toggle-chat" aria-pressed={showChat}
-          onClick={() => setShowChat((v) => !v)}>Chat</GlassButton>
+          onClick={() => setChatPref(!showChat)}>Chat</GlassButton>
       </header>
-      <div className="reader" data-loaded={loaded ? '1' : '0'} data-chat={showChat ? '1' : '0'}>
+      <div ref={readerRef} className="reader" data-loaded={loaded ? '1' : '0'} data-chat={showChat ? '1' : '0'} data-layout={narrow ? 'narrow' : 'wide'}>
         <div
           ref={pdfs}
           className="pdfs"
@@ -141,7 +156,10 @@ export function Reader({ chat, pending, onPendingDone }: { chat: ChatApi; pendin
           />
           <ViewerPane ref={paneB} slot="B" doc={slots.B} error={errors.B} onPick={pick} onPath={setPath} onClear={clear} />
         </div>
-        {showChat && <ChatPanel chat={chat} hasDocs={hasDocs} warning={warning} onCite={onCite} />}
+        {showChat && (
+          <ChatPanel chat={chat} hasDocs={hasDocs} warning={warning} onCite={onCite}
+            overlay={narrow} onClose={() => setChatPref(false)} />
+        )}
       </div>
     </>
   );

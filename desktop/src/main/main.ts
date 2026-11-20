@@ -13,6 +13,16 @@ import { HOST, installProtocol, registerScheme, SCHEME } from './protocol';
 const SMOKE = process.argv.includes('--smoke');
 const SELFTEST = process.argv.includes('--selftest') || SMOKE;
 const T0 = Date.now();
+
+// Autoteste: pasta de dados do Electron isolada (localStorage com a preferência da barra lateral, caches...),
+// para nunca gravar no perfil real do usuário. ESTUDO_USERDATA permite reaproveitar a mesma pasta entre duas
+// execuções (prova de que a preferência sobrevive ao reinício).
+if (SELFTEST) {
+  app.setPath('userData', process.env.ESTUDO_USERDATA ?? fs.mkdtempSync(path.join(os.tmpdir(), 'estudotron-userdata-')));
+  // Medições não podem depender de outra janela por cima: o Chromium reduz os quadros de janelas encobertas.
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+}
 let backendReadyMs: number | null = null;
 /** --shots=<pasta>: o autoteste salva capturas da janela (só em --selftest). */
 const SHOTS_DIR = SELFTEST ? process.argv.find((a) => a.startsWith('--shots='))?.slice('--shots='.length) : undefined;
@@ -64,7 +74,7 @@ function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1140,
+    minWidth: 980, // a barra lateral recolhe e o chat vira painel sobreposto em janelas estreitas
     minHeight: 560,
     // janela oculta suspende o rAF: capturas e medição de quadros exigem janela visível (--shots ou --show)
     show: !SELFTEST || !!SHOTS_DIR || process.argv.includes('--show'),
@@ -158,6 +168,15 @@ ipcMain.handle('app:info', () => ({
   electron: process.versions.electron,
   chromium: process.versions.chrome,
 }));
+
+/** Só no autoteste: muda o tamanho da área útil da janela (para testar resoluções). */
+ipcMain.handle('selftest:resize', async (_e, w: number, h: number) => {
+  if (!SELFTEST || !mainWindow) return null;
+  if (mainWindow.isMinimized()) mainWindow.restore(); // minimizada, a janela não anima nem desenha
+  mainWindow.setContentSize(Math.round(w), Math.round(h));
+  await new Promise((r) => setTimeout(r, 350));
+  return mainWindow.getContentSize();
+});
 
 ipcMain.handle('selftest:capture', async (_e, name: string) => {
   if (!SHOTS_DIR || !mainWindow) return null;

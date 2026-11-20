@@ -49,6 +49,7 @@ export class GlassEngine {
   private bgClock = 0;
   private lastFrame = 0;
   private lastDraw = 0;
+  private kickUntil = 0;
   private readonly recs: Rec[] = [];
   private readonly light = { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0 };
   private readonly rects = new Float32Array(MAX_SHAPES * 4);
@@ -154,6 +155,12 @@ export class GlassEngine {
     if (!this.raf && this.ok) this.raf = requestAnimationFrame((t) => this.frame(t));
   }
 
+  /** Desenha a cada quadro por `ms` (ex.: enquanto o layout anima em CSS e os retângulos mudam). */
+  kick(ms: number): void {
+    this.kickUntil = Math.max(this.kickUntil, performance.now() + ms);
+    this.request();
+  }
+
   // ---------- internos ----------
 
   private compile(type: number, src: string): WebGLShader {
@@ -217,6 +224,7 @@ export class GlassEngine {
     L.x += L.vx * dt;
     L.y += L.vy * dt;
     if (Math.abs(L.x - L.tx) + Math.abs(L.y - L.ty) + Math.abs(L.vx) + Math.abs(L.vy) > 0.05) moving = true;
+    if (now < this.kickUntil) moving = true; // layout animando: quadro a quadro, sem o limite de repouso
 
     // fundo animado só com a janela em foco; em repouso, 30 quadros/s
     const animateBg = focused && !this.opts.still;
