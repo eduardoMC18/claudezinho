@@ -63,6 +63,9 @@ uniform vec4 uRect[MAXS];
 uniform vec4 uP[MAXS];       // raio, bisel, espessura, tipo
 uniform float uPress[MAXS];
 uniform vec2 uLight;
+uniform float uThickness;   // espessura como múltiplo do normal (0,25–2)
+uniform float uTint;        // 0 = clear, 1 = tinted (mais véu branco)
+uniform float uDisp;        // 1 = dispersão cromática (3 amostras), 0 = uma amostra (qualidade baixa)
 out vec4 o;
 vec3 bgAt(vec2 px, float lod){ vec2 q = px / uRes; return textureLod(uBg, vec2(q.x, 1.0 - q.y), lod).rgb; }
 float sdRR(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
@@ -75,7 +78,7 @@ void main(){
     float r = min(uP[i].x, min(b.x, b.y));
     float d = sdRR(p - c, b, r);
     if (d > 1.0) continue;
-    float type = uP[i].w, B = max(uP[i].y, 2.0), thick = uP[i].z;
+    float type = uP[i].w, B = max(uP[i].y, 2.0), thick = uP[i].z * uThickness;
     float t = clamp(-d / B, 0.0, 1.0);
     vec2 e = vec2(1.0, 0.0);
     vec2 g = normalize(vec2(sdRR(p-c+e.xy,b,r) - sdRR(p-c-e.xy,b,r), sdRR(p-c+e.yx,b,r) - sdRR(p-c-e.yx,b,r)) + vec2(1e-5));
@@ -88,23 +91,29 @@ void main(){
     float press = uPress[i];
     if (type > 0.5) {
       float ior = 1.42 + 0.10*press, disp = 0.035 + 0.03*press;
-      vec3 iors = vec3(ior - disp, ior, ior + disp), acc = vec3(0.0);
-      for (int k = 0; k < 3; k++) {
-        vec3 R = refract(vec3(0.0,0.0,-1.0), N, 1.0 / iors[k]);
+      vec2 mag = (p - c) * 0.10 * smoothstep(0.0, 1.0, t);
+      if (uDisp > 0.5) {
+        vec3 iors = vec3(ior - disp, ior, ior + disp), acc = vec3(0.0);
+        for (int k = 0; k < 3; k++) {
+          vec3 R = refract(vec3(0.0,0.0,-1.0), N, 1.0 / iors[k]);
+          vec2 off = R.xy / max(abs(R.z), 0.2) * thick * 3.4;
+          acc[k] = bgAt(p - off - mag, 0.0)[k];
+        }
+        rgb = acc;
+      } else {
+        vec3 R = refract(vec3(0.0,0.0,-1.0), N, 1.0 / ior);
         vec2 off = R.xy / max(abs(R.z), 0.2) * thick * 3.4;
-        vec2 mag = (p - c) * 0.10 * smoothstep(0.0, 1.0, t);
-        acc[k] = bgAt(p - off - mag, 0.0)[k];
+        rgb = bgAt(p - off - mag, 0.0);
       }
-      rgb = acc;
       float lum = dot(rgb, vec3(0.299,0.587,0.114));
       rgb = mix(vec3(lum), rgb, 1.5);
-      rgb = type > 1.5 ? mix(rgb, vec3(0.17,0.18,0.20), 0.66) : mix(rgb, vec3(1.0), 0.04);
+      rgb = type > 1.5 ? mix(rgb, vec3(0.17,0.18,0.20), 0.66) : mix(rgb, vec3(1.0), 0.04 + 0.14*uTint);
       rgb *= 1.0 - 0.10 * pow(1.0 - t, 2.5) * smoothstep(-2.0, 2.0, -d);
     } else {
       rgb = bgAt(p, 2.8);
       float lum = dot(rgb, vec3(0.299,0.587,0.114));
       rgb = mix(vec3(lum), rgb, 1.5);
-      rgb = mix(rgb, vec3(1.0), 0.24);
+      rgb = mix(rgb, vec3(1.0), 0.24 + 0.30*uTint);
     }
     rgb *= 1.03;
     float spec = pow(max(dot(N, H), 0.0), 60.0) * (type > 0.5 ? (type > 1.5 ? 0.6 : 1.0) : 0.25);

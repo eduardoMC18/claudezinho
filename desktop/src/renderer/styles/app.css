@@ -53,7 +53,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .brand-row .tipwrap { flex: none; }
 .tip { position: absolute; left: calc(100% + 14px); top: 50%; transform: translateY(-50%); z-index: 40; white-space: nowrap; pointer-events: none;
   padding: 6px 12px; border-radius: 12px; font-size: 12.5px; font-weight: 500; color: var(--ink); background: rgba(255, 255, 255, .96);
-  box-shadow: 0 0 0 1px var(--line), 0 10px 24px -14px rgba(0, 0, 0, .3); animation: tip-in .14s ease-out; }
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px -6px rgba(0, 0, 0, .14); animation: tip-in .14s ease-out; }
 @keyframes tip-in { from { opacity: 0; transform: translate(-4px, -50%); } }
 .icon { width: 18px; height: 18px; flex: none; }
 
@@ -92,6 +92,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .model .price { color: var(--ink-3); font-size: 12px; }
 .loading { color: var(--ink-2); padding: 8px; }
 
+/* ---- Aparência do vidro (controles planos) ---- */
+.appearance { gap: 6px; }
+.pref-row { display: flex; align-items: center; gap: 20px; padding: 12px 2px; border-top: 1px solid var(--line); }
+.prov-head + .pref-row { border-top: 0; }
+.pref-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.pref-text b { font-size: 14px; }
+.pref-text span { font-size: 12.5px; color: var(--ink-2); }
+.pref-control { flex: none; display: flex; align-items: center; }
+/* controle segmentado: trilho a 5%, anel de 1 px, pílula ativa clara (como no GlassyUI) */
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .05); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1); }
+.seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--ink-2); cursor: pointer; white-space: nowrap; transition: background .18s, color .18s; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-checked="true"] { background: #fff; color: var(--ink); font-weight: 600; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 0 0 1px rgba(0, 0, 0, .14), 0 1px 0 rgba(0, 0, 0, .16); }
+.range-wrap { display: flex; align-items: center; gap: 12px; }
+.range { width: 190px; accent-color: #2a2b2f; }
+.range-out { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); }
+.switch { position: relative; display: inline-flex; cursor: pointer; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch .track { width: 42px; height: 26px; border-radius: 999px; background: rgba(0, 0, 0, .12); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1); transition: background .2s; position: relative; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .22s var(--ease); }
+.switch input:checked + .track { background: #2a2b2f; }
+.switch input:checked + .track .knob { transform: translateX(16px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 1100px) { .pref-row { flex-direction: column; align-items: flex-start; gap: 8px; } }
+
 /* ---- Leitor de PDFs ---- */
 .main > .head + .reader { min-height: 0; }
 .reader { position: relative; display: flex; gap: 12px; min-height: 0; min-width: 0; padding: 0 2px 2px 0; }
@@ -101,7 +126,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 /* Área estreita: o chat vira painel sobreposto (aberto pelo botão "Chat"); os PDFs ficam com a largura toda.
    Fundo quase opaco: sobre as páginas, o texto do chat precisa de contraste. */
 .chat.overlay { position: absolute; top: 0; right: 2px; bottom: 2px; z-index: 10; width: min(420px, calc(100% - 24px));
-  background: rgba(250, 250, 252, .97); border-radius: 30px; box-shadow: 0 0 0 1px var(--line), 0 18px 44px -24px rgba(0, 0, 0, .35);
+  background: rgba(250, 250, 252, .97); border-radius: 30px; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px -6px rgba(0, 0, 0, .14);
   animation: chat-in .22s var(--ease); }
 @keyframes chat-in { from { opacity: 0; transform: translateX(16px); } }
 /* O vidro da GPU fica ATRÁS do DOM: o fundo opaco do painel sobreposto o esconderia. Dentro dele, os controles
@@ -166,7 +191,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
 .msgfield textarea { width: 100%; resize: none; border: 0; background: transparent; line-height: 20px; max-height: 100px; outline-offset: 12px; font: inherit; }
 .msgfield textarea::placeholder { color: var(--ink-3); }
 .btn.send { width: 46px; height: 46px; padding: 0; font-size: 16px; flex: none; }
-.history { position: absolute; z-index: 5; left: 16px; right: 16px; top: 100px; max-height: 50%; overflow: auto; background: rgba(255, 255, 255, .97); border-radius: 18px; box-shadow: 0 0 0 1px var(--line), 0 18px 40px -22px rgba(0, 0, 0, .35); padding: 6px; display: grid; gap: 2px; }
+.history { position: absolute; z-index: 5; left: 16px; right: 16px; top: 100px; max-height: 50%; overflow: auto; background: rgba(255, 255, 255, .97); border-radius: 18px; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px -6px rgba(0, 0, 0, .14); padding: 6px; display: grid; gap: 2px; }
 .hist-item { text-align: left; border: 0; background: transparent; padding: 10px 12px; border-radius: 12px; cursor: pointer; display: grid; gap: 1px; }
 .hist-item:hover, .hist-item.current { background: rgba(60, 62, 70, .08); }
 .hist-item span { font-size: 12px; color: var(--ink-3); }
@@ -288,3 +313,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); out
   * { scroll-behavior: auto !important; }
   .app, .sidebar, .sidebar *, .tip { transition: none !important; animation: none !important; }
 }
+/* "Reduzir movimento" escolhido na própria interface (data-lg-motion) vale igual à configuração do sistema */
+:root[data-lg-motion="reduced"] .app, :root[data-lg-motion="reduced"] .sidebar, :root[data-lg-motion="reduced"] .sidebar *,
+:root[data-lg-motion="reduced"] .tip, :root[data-lg-motion="reduced"] .chat.overlay, :root[data-lg-motion="reduced"] .thinking i,
+:root[data-lg-motion="reduced"] .switch .knob, :root[data-lg-motion="reduced"] .seg button { transition: none !important; animation: none !important; }

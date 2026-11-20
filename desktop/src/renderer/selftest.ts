@@ -535,6 +535,144 @@ async function smokeReader(info: Awaited<ReturnType<EstudoBridge['info']>>, chec
   });
 }
 
+// ---------- Aparência do vidro (preferências do material) ----------
+
+const ap = () => document.querySelector<HTMLElement>('[data-section="appearance"]')!;
+const apSeg = (name: string, value: string) => ap().querySelector<HTMLElement>(`[data-pref="${name}"] [data-value="${value}"]`)!;
+const apSwitch = (name: string) => ap().querySelector<HTMLInputElement>(`input[data-pref="${name}"]`)!;
+const apRange = () => ap().querySelector<HTMLInputElement>('input[data-pref="thickness"]')!;
+const setRange = (v: number) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(apRange(), String(v));
+  apRange().dispatchEvent(new Event('input', { bubbles: true }));
+};
+const glassEngine = () => window.__glass!.engine!;
+const savedGlass = (): Record<string, unknown> | null => { try { const r = localStorage.getItem('estudotron.glass'); return r ? JSON.parse(r) : null; } catch { return null; } };
+const root = () => document.documentElement;
+const lum = (c: number[]) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+
+/** Luminância média de vários pontos DENTRO da barra lateral (película), lida da própria GPU. */
+async function sidebarLuma(): Promise<number> {
+  const r = document.querySelector('.sidebar')!.getBoundingClientRect();
+  let sum = 0, n = 0;
+  for (let i = 0; i < 12; i++) {
+    const rgb = await glassEngine().probe(r.left + r.width / 2, r.top + r.height * (0.18 + i * 0.065));
+    sum += lum(rgb); n++;
+  }
+  return sum / n;
+}
+
+async function appearanceScenario(info: Awaited<ReturnType<EstudoBridge['info']>>, check: CheckFn): Promise<void> {
+  nav('settings');
+  await waitFor(() => document.querySelector('[data-section="appearance"]'), 6000);
+  const visible = info.windowVisible; // janela oculta suspende os quadros: testes de pixel/quadros dependem disso
+
+  await check('Provedor escreve os atributos data-lg-* no <html> (padrões)', async () => {
+    const a = { mode: root().dataset.lgMode, quality: root().dataset.lgQuality, motion: root().dataset.lgMotion, transp: root().dataset.lgTransparency, thick: root().dataset.lgThickness };
+    if (a.mode !== 'clear' || a.motion !== 'full' || a.transp !== 'full' || a.thick !== '1' || !['low', 'medium', 'high'].includes(a.quality ?? '')) throw new Error(JSON.stringify(a));
+    return JSON.stringify(a);
+  });
+  await check('Seção "Aparência do vidro": modo, espessura, qualidade e dois interruptores', async () => {
+    const ok = [apSeg('mode', 'clear'), apSeg('mode', 'tinted'), apRange(), apSeg('quality', 'auto'), apSeg('quality', 'low'), apSeg('quality', 'medium'), apSeg('quality', 'high'), apSwitch('reduceMotion'), apSwitch('reduceTransparency'), ap().querySelector('[data-action="reset-glass"]')];
+    if (ok.some((x) => !x)) throw new Error('controle ausente');
+    return `automática: ${apSeg('quality', 'auto').textContent}`;
+  });
+
+  await check('Espessura: o slider chega ao motor, é limitada a 0,25–2 e é salva', async () => {
+    setRange(1.6); await sleep(150);
+    if (glassEngine().cfg.thickness !== 1.6) throw new Error(`motor: ${glassEngine().cfg.thickness}`);
+    if (savedGlass()?.thickness !== 1.6 || root().dataset.lgThickness !== '1.6') throw new Error('não salvou/atributo');
+    if (ap().querySelector('[data-pref-out="thickness"]')!.textContent !== '1,60×') throw new Error('rótulo');
+    setRange(5); await sleep(120);
+    if (glassEngine().cfg.thickness !== 2) throw new Error(`máximo: ${glassEngine().cfg.thickness}`);
+    setRange(0.01); await sleep(120);
+    if (glassEngine().cfg.thickness !== 0.25) throw new Error(`mínimo: ${glassEngine().cfg.thickness}`);
+    setRange(1); await sleep(120);
+    return '1,6 → motor; 5 → 2; 0,01 → 0,25';
+  });
+
+  await check('Modo Tingido: a película fica mais clara de fato (pixels lidos da GPU)', async () => {
+    if (!visible) return 'IGNORADA: janela oculta suspende o desenho (use --show)';
+    apSeg('mode', 'clear').click(); await sleep(250);
+    const clear = await sidebarLuma();
+    apSeg('mode', 'tinted').click(); await sleep(250);
+    const tinted = await sidebarLuma();
+    if (root().dataset.lgMode !== 'tinted' || glassEngine().cfg.tinted !== true) throw new Error('modo não chegou ao motor');
+    if (tinted < clear + 1.5) throw new Error(`sem diferença visível (transparente ${clear.toFixed(1)} · tingido ${tinted.toFixed(1)})`);
+    return `luminância média da barra: ${clear.toFixed(1)} → ${tinted.toFixed(1)} (de 255)`;
+  });
+  await window.estudo.capture('15-aparencia-tingido');
+  apSeg('mode', 'clear').click(); await sleep(200);
+
+  await check('Qualidade: baixa e média reduzem o fundo refratado; automática volta à detectada', async () => {
+    const e = glassEngine();
+    const detected = root().dataset.lgQuality!;
+    apSeg('quality', 'low').click(); await sleep(250);
+    if (e.cfg.quality !== 'low' || e.stats.bgScale !== 0.5 || root().dataset.lgQuality !== 'low') throw new Error(`baixa: ${e.cfg.quality} ${e.stats.bgScale}`);
+    const f0 = e.stats.frames; await sleep(500);
+    if (visible && e.stats.frames - f0 < 3) throw new Error('o motor parou em qualidade baixa');
+    const quality = () => e.cfg.quality as string; // leitura nova a cada chamada (o TS estreitaria o tipo)
+    const scale = () => e.stats.bgScale as number;
+    apSeg('quality', 'medium').click(); await sleep(250);
+    if (quality() !== 'medium' || scale() !== 0.75) throw new Error(`média: ${quality()} ${scale()}`);
+    apSeg('quality', 'auto').click(); await sleep(250);
+    if (quality() !== detected || savedGlass()?.quality !== null) throw new Error(`automática: ${quality()} (detectada ${detected}); salvo ${String(savedGlass()?.quality)}`);
+    return `baixa 0,5× · média 0,75× · automática = ${detected}`;
+  });
+  await window.estudo.capture('16-aparencia-qualidade');
+
+  await check('Reduzir transparência: material opaco, o motor para e volta ao desligar', async () => {
+    const e = glassEngine();
+    apSwitch('reduceTransparency').click(); await sleep(350);
+    if (!root().classList.contains('no-gl') || root().dataset.lgTransparency !== 'reduced') throw new Error('reserva não ativou');
+    if (getComputedStyle(document.getElementById('glass-canvas')!).display !== 'none') throw new Error('o canvas continua visível');
+    const bg = getComputedStyle(document.querySelector('.sidebar')!).backgroundColor;
+    if (bg === 'rgba(0, 0, 0, 0)') throw new Error('a barra ficou transparente no modo opaco');
+    const f0 = e.stats.frames; await sleep(500);
+    if (e.stats.frames - f0 > 1) throw new Error(`o motor continuou desenhando (${e.stats.frames - f0} quadros)`);
+    apSwitch('reduceTransparency').click(); await sleep(450);
+    if (root().classList.contains('no-gl')) throw new Error('não voltou ao vidro');
+    const f1 = e.stats.frames; await sleep(500);
+    if (visible && e.stats.frames - f1 < 3) throw new Error('o motor não retomou');
+    return `opaco (fundo ${bg}), motor parado e retomado`;
+  });
+
+  await check('Reduzir movimento: o fundo para, as transições desligam e voltam ao desligar', async () => {
+    const e = glassEngine();
+    const c0 = e.stats.bgClock; await sleep(500);
+    const moving = e.stats.bgClock > c0;
+    apSwitch('reduceMotion').click(); await sleep(300);
+    if (root().dataset.lgMotion !== 'reduced') throw new Error('atributo');
+    const c1 = e.stats.bgClock; await sleep(600);
+    if (e.stats.bgClock !== c1) throw new Error('o fundo continua animando');
+    const dur = getComputedStyle(document.querySelector('.sidebar .label')!).transitionDuration;
+    if (!/^0s(, 0s)*$/.test(dur)) throw new Error(`transição ativa: ${dur}`);
+    apSwitch('reduceMotion').click(); await sleep(300);
+    const c2 = e.stats.bgClock; await sleep(500);
+    if (visible && e.stats.bgClock <= c2) throw new Error('o fundo não voltou a animar');
+    return `fundo ${moving ? 'animava' : 'parado (janela oculta)'} → parado → ${visible ? 'animando' : 'ok'}; transições 0s`;
+  });
+
+  await check('Restaurar padrões limpa a preferência salva', async () => {
+    setRange(1.4); apSeg('mode', 'tinted').click(); apSeg('quality', 'low').click(); await sleep(200);
+    if (!savedGlass()) throw new Error('nada foi salvo');
+    (ap().querySelector('[data-action="reset-glass"]') as HTMLElement).click(); await sleep(250);
+    if (savedGlass() !== null) throw new Error('preferência não foi limpa');
+    const c = glassEngine().cfg;
+    if (c.thickness !== 1 || c.tinted || root().dataset.lgMode !== 'clear' || root().dataset.lgThickness !== '1') throw new Error(JSON.stringify(c));
+    return 'espessura 1, transparente, qualidade automática';
+  });
+
+  await check('Escolha final fica salva (a 2ª execução prova que sobrevive ao reinício)', async () => {
+    apSeg('mode', 'tinted').click(); setRange(1.3); await sleep(250);
+    const s = savedGlass();
+    if (s?.mode !== 'tinted' || s?.thickness !== 1.3) throw new Error(JSON.stringify(s));
+    return JSON.stringify(s);
+  });
+  await window.estudo.capture('17-aparencia-configuracoes');
+  nav('reader');
+  void info;
+}
+
 // ---------- Barra lateral recolhível e layout responsivo ----------
 
 const sb = () => document.querySelector<HTMLElement>('.sidebar')!;
@@ -899,6 +1037,12 @@ export async function runSelfTest(): Promise<void> {
     return `${el.getAttribute('data-collapsed') === '1' ? 'collapsed' : 'expanded'}; preferência salva: ${savedPref() ?? 'nenhuma'} | ${dbg}`;
   });
 
+  await check('Aparência do vidro ao iniciar', async () => {
+    const eng = await waitFor(() => window.__glass?.engine, 5000);
+    if (!eng) throw new Error('motor ausente');
+    return `mode=${eng.cfg.tinted ? 'tinted' : 'clear'}; thickness=${eng.cfg.thickness}; quality=${eng.cfg.quality}; salvo=${localStorage.getItem('estudotron.glass') ?? 'nenhum'}`;
+  });
+
   // ---- casca (Etapa 1) ----
   await check('Contexto isolado (sem Node na página)', async () => {
     const g = globalThis as unknown as Record<string, unknown>;
@@ -1024,6 +1168,7 @@ export async function runSelfTest(): Promise<void> {
     await readerScenario(info, check, results);
     await chatScenario(info, check);
     await exercisesScenario(info, check);
+    await appearanceScenario(info, check);
     await layoutScenario(info, check);
   }
 

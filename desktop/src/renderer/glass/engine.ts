@@ -28,7 +28,23 @@ interface Rec {
 }
 
 const DPR_CAP = 2;
-const IDLE_FRAME_MS = 1000 / 30; // fundo em repouso: 30 quadros/s (economia)
+
+/** Níveis de qualidade: resolução do fundo refratado, dispersão cromática e taxa do fundo em repouso. */
+const TIERS = {
+  low: { bgScale: 0.5, dispersion: false, idleMs: 1000 / 15 },
+  medium: { bgScale: 0.75, dispersion: true, idleMs: 1000 / 24 },
+  high: { bgScale: 1, dispersion: true, idleMs: 1000 / 30 },
+} as const;
+
+/** Parâmetros de material e economia aplicados a partir das preferências do usuário. */
+export interface GlassConfig {
+  thickness: number;
+  tinted: boolean;
+  quality: keyof typeof TIERS;
+  reduceMotion: boolean;
+  /** true = não desenha (material de reserva em CSS no lugar). */
+  paused: boolean;
+}
 
 export interface EngineEvents {
   /** WebGL perdido/restaurado: a interface troca para o material de reserva (CSS). */
@@ -55,11 +71,34 @@ export class GlassEngine {
   private readonly rects = new Float32Array(MAX_SHAPES * 4);
   private readonly prm = new Float32Array(MAX_SHAPES * 4);
   private readonly prs = new Float32Array(MAX_SHAPES);
-  private readonly reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private bgW = 0;
+  private bgH = 0;
+  private probes: Array<{ x: number; y: number; done: (rgb: number[]) => void }> = [];
   private readonly cleanup: Array<() => void> = [];
 
+  /** Configuração em uso (ver `configure`). */
+  readonly cfg: GlassConfig = { thickness: 1, tinted: false, quality: 'high', reduceMotion: false, paused: false };
+
   /** Telemetria leve para testes e medição (últimos quadros). */
-  readonly stats = { frames: 0, dts: [] as number[], shapes: 0 };
+  readonly stats = { frames: 0, dts: [] as number[], shapes: 0, bgClock: 0, bgScale: 1 };
+
+  /** Aplica as preferências de material. Chamável a qualquer momento (efeito no próximo quadro). */
+  configure(next: Partial<GlassConfig>): void {
+    const prevQuality = this.cfg.quality;
+    Object.assign(this.cfg, next);
+    if (next.reduceMotion !== undefined) for (const r of this.recs) r.press.retune(this.cfg.reduceMotion ? 1 : 0.62);
+    if (this.ok && this.cfg.quality !== prevQuality) this.resizeBg();
+    this.stats.bgScale = TIERS[this.cfg.quality].bgScale;
+    if (!this.cfg.paused) { this.lastFrame = 0; this.request(); }
+  }
+
+  /** Lê um pixel da tela depois do próximo quadro desenhado (para testar o efeito real do material). */
+  probe(x: number, y: number): Promise<number[]> {
+    return new Promise((resolve) => {
+      this.probes.push({ x, y, done: resolve });
+      this.request();
+    });
+  }
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -79,7 +118,7 @@ export class GlassEngine {
     this.progBg = this.program(VS, FS_BG);
     this.progGlass = this.program(VS, FS_GLASS);
     for (const n of ['uRes', 'uTime']) this.loc['bg_' + n] = gl.getUniformLocation(this.progBg, n);
-    for (const n of ['uBg', 'uRes', 'uCount', 'uRect', 'uP', 'uPress', 'uLight']) this.loc['g_' + n] = gl.getUniformLocation(this.progGlass, n);
+    for (const n of ['uBg', 'uRes', 'uCount', 'uRect', 'uP', 'uPress', 'uLight', 'uThickness', 'uTint', 'uDisp']) this.loc['g_' + n] = gl.getUniformLocation(this.progGlass, n);
     gl.bindVertexArray(gl.createVertexArray());
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
@@ -135,7 +174,7 @@ export class GlassEngine {
   register(el: HTMLElement, opts: GlassOpts): GlassHandle {
     let depth = 0;
     for (let n: HTMLElement | null = el.parentElement; n; n = n.parentElement) depth++;
-    const rec: Rec = { el, opts, depth, press: new Spring(0, this.reducedMotion ? 1 : 0.62, 30) };
+    const rec: Rec = { el, opts, depth, press: new Spring(0, this.cfg.reduceMotion ? 1 : 0.62, 30) };
     this.recs.push(rec);
     this.recs.sort((a, b) => a.depth - b.depth); // pai antes do filho (o filho desenha por cima)
     this.request();
@@ -191,7 +230,20 @@ export class GlassEngine {
     if (w === this.W && h === this.H) return;
     this.W = this.canvas.width = w;
     this.H = this.canvas.height = h;
+    void gl;
+    this.resizeBg();
+  }
+
+  /** (Re)cria a textura do fundo refratado na resolução do nível de qualidade (menor = mais barato). */
+  private resizeBg(): void {
+    const gl = this.gl;
+    const s = TIERS[this.cfg.quality].bgScale;
+    const w = Math.max(2, Math.round(this.W * s));
+    const h = Math.max(2, Math.round(this.H * s));
     if (this.bgTex) gl.deleteTexture(this.bgTex);
+    this.bgW = w;
+    this.bgH = h;
+    this.stats.bgScale = s;
     this.bgTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.bgTex);
     gl.texStorage2D(gl.TEXTURE_2D, Math.floor(Math.log2(Math.max(w, h))) + 1, gl.RGBA8, w, h);
@@ -206,7 +258,7 @@ export class GlassEngine {
 
   private frame(now: number): void {
     this.raf = 0;
-    if (!this.ok || document.hidden) return;
+    if (!this.ok || document.hidden || this.cfg.paused) return;
     const dt = Math.min((now - (this.lastFrame || now)) / 1000, 0.05);
     this.lastFrame = now;
     const focused = document.hasFocus() || !!this.opts.alwaysAnimate;
@@ -226,10 +278,11 @@ export class GlassEngine {
     if (Math.abs(L.x - L.tx) + Math.abs(L.y - L.ty) + Math.abs(L.vx) + Math.abs(L.vy) > 0.05) moving = true;
     if (now < this.kickUntil) moving = true; // layout animando: quadro a quadro, sem o limite de repouso
 
-    // fundo animado só com a janela em foco; em repouso, 30 quadros/s
-    const animateBg = focused && !this.opts.still;
+    // fundo animado só com a janela em foco e sem "reduzir movimento"; em repouso, a taxa do nível de qualidade
+    const animateBg = focused && !this.opts.still && !this.cfg.reduceMotion;
     if (animateBg) this.bgClock += dt;
-    if (!moving && animateBg && now - this.lastDraw < IDLE_FRAME_MS - 1) { this.request(); return; }
+    this.stats.bgClock = this.bgClock;
+    if (!moving && animateBg && this.probes.length === 0 && now - this.lastDraw < TIERS[this.cfg.quality].idleMs - 1) { this.request(); return; }
     this.lastDraw = now;
 
     // 2) ler retângulos do DOM (depois de escrever transforms) e enviar ao shader
@@ -252,9 +305,9 @@ export class GlassEngine {
     // 3) desenhar
     const gl = this.gl, W = this.W, H = this.H, loc = this.loc;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.bgFbo);
-    gl.viewport(0, 0, W, H);
+    gl.viewport(0, 0, this.bgW, this.bgH);
     gl.useProgram(this.progBg);
-    gl.uniform2f(loc.bg_uRes, W, H);
+    gl.uniform2f(loc.bg_uRes, this.bgW, this.bgH);
     gl.uniform1f(loc.bg_uTime, this.bgClock);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindTexture(gl.TEXTURE_2D, this.bgTex);
@@ -272,7 +325,19 @@ export class GlassEngine {
     gl.uniform4fv(loc.g_uP, this.prm);
     gl.uniform1fv(loc.g_uPress, this.prs);
     gl.uniform2f(loc.g_uLight, L.x * dpr, L.y * dpr);
+    gl.uniform1f(loc.g_uThickness, this.cfg.thickness);
+    gl.uniform1f(loc.g_uTint, this.cfg.tinted ? 1 : 0);
+    gl.uniform1f(loc.g_uDisp, TIERS[this.cfg.quality].dispersion ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    // sondas de pixel (testes): lidas logo após o desenho, antes de o quadro ser composto
+    if (this.probes.length) {
+      const px = new Uint8Array(4);
+      for (const p of this.probes.splice(0)) {
+        gl.readPixels(Math.round(p.x * dpr), Math.round(H - p.y * dpr), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        p.done([px[0], px[1], px[2]]);
+      }
+    }
 
     this.stats.frames++;
     const d = this.stats.dts;

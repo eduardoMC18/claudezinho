@@ -1,0 +1,118 @@
+{
+  "source": "https://glassyui.com/components/glass-provider",
+  "note": "Component documentation page; distinct from the Glassy UI home page analysed in ../glassyui.com.json. CSS measured describes the docs chrome; glass appears on few nodes.",
+  "tokens": {
+    "spacing": {
+      "scale": [1, 2, 4, 5, 6, 8, 10, 11, 12, 13, 14, 16, 32, 56],
+      "base_unit": 2,
+      "section_gap": "56px",
+      "code_padding": "16px 18px 18px",
+      "footer_margin_top": "160px"
+    },
+    "typography": {
+      "families": ["-apple-system", "ui-monospace"],
+      "scale": [
+        { "role": "h1", "size": "48px", "weight": "600", "lineHeight": "51.84px", "letterSpacing": "-0.144px", "family": "-apple-system" },
+        { "role": "h2", "size": "28px", "weight": "600", "lineHeight": "31.92px", "letterSpacing": "0.196px", "family": "-apple-system" },
+        { "role": "h3-api-name", "size": "16px", "weight": "600", "lineHeight": "23.5px", "family": "ui-monospace" },
+        { "role": "lede", "size": "19px", "weight": "400", "family": "-apple-system" },
+        { "role": "ui-text", "size": "12-14px", "weight": "400-600", "family": "-apple-system" }
+      ]
+    },
+    "colors": [
+      { "role": "page-background", "value": "#FAF9F7" },
+      { "role": "surface", "value": "#FFFFFF", "note": "96.2% da area com fundo proprio" },
+      { "role": "text-primary", "value": "#222224" },
+      { "role": "text-secondary", "value": "#66666A" },
+      { "role": "text-tertiary", "value": "#505055" },
+      { "role": "code-type", "value": "#0B4F79" },
+      { "role": "code-tag", "value": "#A5361F" },
+      { "role": "link", "value": "#005EC6" },
+      { "role": "control-track", "value": "rgba(0,0,0,0.05)" },
+      { "role": "glass-fill", "value": "rgba(255,255,255,0.72)" }
+    ],
+    "radius": ["9px (49 nodes)", "999px (32)", "9999px (10)", "16px (7)", "6px (4)", "28px (preview stage)"],
+    "shadows": [
+      "0 1px 2px rgba(0,0,0,0.06), 0 8px 24px -6px rgba(0,0,0,0.14)",
+      "inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(0,0,0,0.14), 0 1px 0 rgba(0,0,0,0.16)",
+      "0 1.8px 2px -1px rgba(52,62,84,0.18), 0 6.7px 10px -5px rgba(52,62,84,0.2)"
+    ],
+    "backdrop_filters": [
+      "blur(2px) saturate(1.5) brightness(1.08)",
+      "blur(16px) brightness(1.06) contrast(1.02) saturate(1.8)",
+      "url(#lg-lens-*): SVG feGaussianBlur(6) + feImage displacement map",
+      "url(#lg-lens-*) grayscale(1) contrast(0.5) brightness(0.35) sepia(1) hue-rotate(172deg) saturate(6) brightness(1.4)"
+    ],
+    "image_ratios": [
+      { "usage": "preview stage", "ratio": "~1.88:1", "size": "684x363" }
+    ],
+    "grid": { "columns": 3, "template": "220px 684px 200px", "gutter": "56px" },
+    "motion": {
+      "press": "scale 0.32s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "rise": "--lg-button-rise 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+      "color": "0.18s to 0.2s",
+      "reduced_motion": true,
+      "focus_visible": true
+    },
+    "component_api": {
+      "provider": "GlassProvider writes data-lg-* attributes on <html>",
+      "preferences": {
+        "theme": "light | dark",
+        "mode": "clear | tinted",
+        "quality": "low | medium | high (detected)",
+        "reduceMotion": "boolean (prefers-reduced-motion)",
+        "reduceTransparency": "boolean (prefers-reduced-transparency)",
+        "thickness": "number, 0.25 to 2, default 1"
+      },
+      "persistence": "localStorage key glassy-ui-preferences"
+    }
+  },
+  "taste": [
+    {
+      "name": "Um provedor decide o material; os componentes obedecem",
+      "trigger": "When the designers faced 38 glass components that must all respect the same theme and accessibility settings on every user's device",
+      "decision": "Chose one GlassProvider that holds the preferences and writes them as data-lg-* attributes on the html element over per-component props or CSS switches",
+      "reason": "Because a user who turns on Reduce Transparency expects every glass surface to change at once; one source of truth makes that a single write",
+      "evidence": [
+        "API text: Holds the preferences and writes them to data-lg-* attributes on the html element",
+        "installation adds 4 files",
+        "useOptionalPreferences returns defaults outside the provider and follows the system reduced-transparency setting",
+        "6 preferences: theme, mode, quality, reduceMotion, reduceTransparency, thickness"
+      ]
+    },
+    {
+      "name": "Qualidade detectada pelo aparelho, com a escolha do usuário acima",
+      "trigger": "When the designers faced a refraction effect that costs real GPU time on phones and low-memory machines",
+      "decision": "Chose to derive quality automatically (low with reduced transparency or 4 GB of memory or less, medium on touch or reduced motion, high otherwise) and let a saved user choice always win",
+      "reason": "Because a weak device that stutters makes the material look broken, while a lower tier that stays smooth keeps the look; the override keeps control with the person",
+      "evidence": [
+        "API table: low with reduced transparency or 4 GB of device memory or less, medium on touch or with reduced motion, otherwise high",
+        "defaultTheme: A saved choice always wins",
+        "reduceTransparency turns off the lens and refraction"
+      ]
+    },
+    {
+      "name": "Espessura como multiplicador limitado, não como estilo",
+      "trigger": "When the designers faced letting products make the glass thicker or thinner without breaking legibility",
+      "decision": "Chose one number, thickness, defined as a multiple of regular glass (default 1) clamped to 0.25 to 2, over exposing raw bevel, blur and refraction values",
+      "reason": "Because a bounded multiplier scales every material parameter together and cannot be pushed to the extremes where text turns unreadable",
+      "evidence": [
+        "API row: Glass thickness as a multiple of regular; applied between 0.25 and 2, type number, default 1",
+        "mode limited to 'clear' | 'tinted'"
+      ]
+    },
+    {
+      "name": "Restraint: documentação plana em volta de um único palco de vidro",
+      "trigger": "When the designers faced a documentation page for a glass library and the pull to make every surrounding panel glass too",
+      "decision": "Chose a flat page (background #FAF9F7, white menus and tables with a 1px ring, 12 to 14px text) and spent backdrop effects on four nodes, with the lens only in the preview stage, over glass sidebars, tables and code blocks",
+      "reason": "Because the material is only readable against a plain background; if the documentation chrome were glass too, the preview would stop being the one place where refraction is the subject",
+      "evidence": [
+        "backdrop-filter on 4 nodes in a 5087px page",
+        "96.2% of the background area is #FFFFFF",
+        "two recurring shadow patterns",
+        "grid 220px 684px 200px with 56px gap and four equal 56px section gaps",
+        "preview stage 684x363px with 28px radius is the only large colour mass"
+      ]
+    }
+  ]
+}

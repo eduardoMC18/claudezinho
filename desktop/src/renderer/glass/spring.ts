@@ -3,16 +3,23 @@ export class Spring {
   x: number;
   v = 0;
   target: number;
-  private readonly k: number;
-  private readonly c: number;
+  private k: number;
+  private c: number;
+  private readonly omega: number;
   private acc = 0;
   private static readonly H = 1 / 240;
 
   constructor(value: number, zeta: number, omega: number) {
     this.x = value;
     this.target = value;
+    this.omega = omega;
     this.k = omega * omega;
     this.c = 2 * zeta * omega;
+  }
+
+  /** Muda o amortecimento (ex.: movimento reduzido usa ζ = 1, sem overshoot). */
+  retune(zeta: number): void {
+    this.c = 2 * zeta * this.omega;
   }
 
   get atRest(): boolean {

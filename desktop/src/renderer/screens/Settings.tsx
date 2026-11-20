@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { aiSettings, type AiOverview, type ModelInfo, type ProviderInfo } from '../api';
 import { GlassButton } from '../ui/GlassButton';
 import { GlassPanel } from '../ui/GlassPanel';
+import { GlassAppearance } from './GlassAppearance';
 
 type Msg = { kind: 'ok' | 'error' | 'info'; text: string };
 
@@ -108,6 +109,7 @@ export function Settings() {
     <>
       <header className="head"><h1>Configurações</h1></header>
       <div className="screen settings">
+        <GlassAppearance />
         {error && <div className="msg error" role="alert">Não foi possível carregar as configurações: {error}</div>}
         {!data && !error && <div className="loading">Carregando…</div>}
         {data?.providers.map((p) => (

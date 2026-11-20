@@ -110,6 +110,28 @@ cd desktop
 
 **Não verificado:** arrastar o divisor com o mouse depois da mudança, e uso com o mouse/teclado de verdade (os testes disparam eventos). Telas com DPI alto (125%/150%) e monitores ultralargos não foram testados.
 
+## Aparência do vidro (design extraído das análises Taste)
+
+Origem: `docs/design-dna/` (GlassCN, Apple Liquid Glass, GlassyUI e a página `glass-provider` do GlassyUI). O que foi aplicado:
+
+| Decisão extraída | Onde está no app |
+|---|---|
+| O material é um **parâmetro do usuário** (claridade/modo, espessura, qualidade, reduzir movimento e transparência), não um visual fixo (GlassCN, GlassyUI) | Configurações → **Aparência do vidro** (`screens/GlassAppearance.tsx`) |
+| **Um provedor decide o material**; os componentes obedecem; atributos `data-lg-*` no `<html>` (GlassyUI) | `glass/GlassProvider.tsx` + `glass/preferences.ts`; atributos `data-lg-mode/quality/motion/transparency/thickness` |
+| **Qualidade detectada pelo aparelho, mas a escolha salva sempre vence** | `detectQuality`: baixa com transparência reduzida ou ≤ 4 GB de memória; média em toque ou movimento reduzido; alta nos demais |
+| **Espessura como múltiplo limitado** (0,25–2×, padrão 1) | slider; uniform `uThickness` no shader |
+| Padrões seguem o **sistema** até o usuário escolher (`prefers-reduced-motion`, `prefers-reduced-transparency`, `forced-colors`) | `systemDefaults()` |
+| **Restraint:** controles de ajuste planos, texto longo opaco, vidro só em poucas superfícies (Apple, GlassyUI) | controle segmentado (trilho 5%, anel de 1 px, pílula clara), interruptores e slider **sem vidro** |
+| Uma sombra **longa de camada única** com espalhamento negativo, em vez de halo cinza (GlassyUI/GlassCN) | chat sobreposto, dicas e histórico: `0 1px 2px .06, 0 8px 24px -6px .14` |
+
+**O que cada preferência faz de fato:** *Modo* Tingido soma véu branco à película e às lentes (`uTint`). *Espessura* escala o desvio da refração. *Qualidade* baixa = fundo refratado a 0,5×, sem dispersão cromática, 15 quadros/s em repouso; média = 0,75× e 24 quadros/s; alta = 1× e 30 quadros/s. *Reduzir movimento* congela o fundo, usa molas sem overshoot e desliga as transições (`data-lg-motion="reduced"`). *Reduzir transparência* **pausa** o motor e usa o material opaco em CSS (`no-gl`), sem destruir o contexto WebGL. Tudo é salvo em `localStorage` (`estudotron.glass`); "Restaurar padrões" apaga a escolha e volta a seguir o sistema.
+
+**Não implementado (de propósito):** tema **escuro**. Exigiria refazer o fundo em shader, o vidro e todo o CSS; a identidade atual é clara. O provedor já tem a estrutura (`PreferencesContext`) para acrescentá-lo depois.
+
+**Verificado** (autoteste, 79 checks, 0 falhas; cada preferência é checada no **efeito real**): atributos `data-lg-*` corretos nos padrões; seção com todos os controles; espessura 1,6 chega ao motor, 5 vira 2 e 0,01 vira 0,25; Tingido clareia a película **lida da GPU** (luminância média 248,5 → 252,5 de 255 na barra lateral); qualidade baixa/média reduzem o fundo a 0,5×/0,75× e "Automática" volta à detectada; reduzir transparência deixa as superfícies opacas, **para** o motor e o retoma; reduzir movimento congela o relógio do fundo e zera as transições; "Restaurar padrões" limpa o salvo; **reinício**: a 2ª execução abre já Tingido e com espessura 1,3.
+
+**Limites:** a diferença do modo Tingido é sutil onde o fundo já é quase branco (o teste mede +4 de 255 na barra lateral); a qualidade **detectada** nesta máquina é "alta", então as faixas de detecção (memória ≤ 4 GB, toque) só foram verificadas pela lógica, não em outro aparelho; não medi o ganho de desempenho de cada nível (só a resolução e os recursos desligados).
+
 ## Comandos (PowerShell)
 
 ```powershell
